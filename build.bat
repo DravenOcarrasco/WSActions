@@ -1,0 +1,1 @@
+bun build .\src\main.js --compile --outfile build/server
