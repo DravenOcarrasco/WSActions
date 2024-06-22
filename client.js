@@ -4,7 +4,7 @@
 // @version      0.13
 // @description  Connects to a secure WebSocket server and performs actions based on commands received
 // @author       Your Name
-// @match        *://*/*
+// @match        *://*
 // @grant        none
 // ==/UserScript==
 
@@ -28,6 +28,18 @@
     function addScript(src) {
         const script = document.createElement('script');
         script.src = src;
+        script.onload = () => {
+            console.info(`EXT_DONE: ${src}`);
+        };
+        script.onerror = () => {
+            console.error(`Erro ao carregar ${src}`);
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro ao carregar extensão',
+                text: `Não foi possível carregar a extensão do URL: ${src}`,
+                confirmButtonText: 'Ok'
+            });
+        };
         document.head.appendChild(script);
     }
 
@@ -43,6 +55,7 @@
                 return [];
             });
     }
+
     loadEnabledExtensions().then(enabledExtensions => {
         console.log(enabledExtensions)
         if (enabledExtensions.length === 0) {
@@ -50,15 +63,17 @@
             return;
         }
 
-        console.log('Extensões habilitadas:', enabledExtensions);
-
-        // Carrega os scripts das extensões habilitadas
-        enabledExtensions.forEach(extension => {
-            if (extension.CLIENT_LINK) {
-                const scriptUrl = `https://127.0.0.1:9515/${extension.CLIENT_LINK}`;
-                addScript(scriptUrl);
-            }
-        });
+        // Espera 10 segundos antes de começar a carregar as extensões
+        setTimeout(() => {
+            // Carrega os scripts das extensões habilitadas
+            enabledExtensions.forEach(extension => {
+                if (extension.CLIENT_LINK) {
+                    const scriptUrl = `https://127.0.0.1:9515/${extension.CLIENT_LINK}`;
+                    addScript(scriptUrl);
+                }
+            });
+            console.log('Extensões habilitadas:', enabledExtensions);
+        }, 5000); // 5 segundos de atraso
     })
 
 })();

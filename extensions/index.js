@@ -96,9 +96,16 @@ const ModuleController = (() => {
                         } else {
                             EXTENSIONS.DISABLED.push(EXT);
                         }
-
+                        // Define a rota para retornar o arquivo client.js
+                        APP.get(`/${EXT.NAME}/client`, (req, res) => {
+                            const filePath = path.resolve(process.execDir, 'extensions', EXT.NAME, './client.js'); // Ajuste o caminho conforme necessário
+                            res.sendFile(filePath, (err) => {
+                                if (err) {
+                                    res.status(500).send(`${filePath} not found`);
+                                }
+                            });
+                        });
                         APP.use(`/${EXT.NAME}`, EXT.ROUTER);
-
                     } catch (error) {
                         console.error(error);
                         EXT.ENABLED = false;

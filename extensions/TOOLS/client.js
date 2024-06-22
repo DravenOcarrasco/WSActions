@@ -101,9 +101,7 @@
         socket.on(`${MODULE_NAME}:command`, (data) => {
             if (!data) return;
             const { command, data: payload } = data;
-            console.log(`Recebeu comando: ${command}`);
             if (command === 'browser:openPage') {
-                console.log(data)
                 window.location.href = data.payload;
             } else if (command === 'browser:reloadPage') {
                 window.location.reload();
@@ -115,6 +113,7 @@
                 clickButton(payload);
             } else if (command === 'replicateAction') {
                 if (!payload) return;
+                if (isMaster) return;
                 actionQueue.push({ payload });
                 if (!isProcessing) processActionQueue(); // Inicia o processamento se a fila não estiver sendo processada
             } else if (command === 'setMaxDelay') {

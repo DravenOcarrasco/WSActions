@@ -21,7 +21,7 @@ const PORT_HTTP = 8080;
 const keyPath = path.resolve(process.execDir, 'key.pem');
 const certPath = path.resolve(process.execDir, 'certificate.pem');
 
-console.log(`EXT_PATH:${path.resolve(process.execDir, 'extensions')}`)
+console.log(`EXT_PATH: ${path.resolve(process.execDir, 'extensions')}`)
 
 // Função para criar certificados se não existirem
 function generateCertificates() {
@@ -79,18 +79,11 @@ io.on('connection', (socket) => {
 
 // Iniciando os servidores WebSocket
 httpServerWS.listen(PORT_WS_HTTP, () => {
-    console.log(`WebSocket HTTP Server is running on http://127.0.0.1:${PORT_WS_HTTP}`);
+    console.log(`HTTP Server is running on http://127.0.0.1:${PORT_WS_HTTP}`);
 });
 
 httpsServerWS.listen(PORT_WS_HTTPS, () => {
-    console.log(`WebSocket HTTPS Server is running on https://127.0.0.1:${PORT_WS_HTTPS}`);
-});
-
-// Servidor HTTP usando Express para servir arquivos estáticos
-const httpServer = http.createServer(app);
-
-httpServer.listen(PORT_HTTP, () => {
-    console.log(`HTTP Server is running on http://127.0.0.1:${PORT_HTTP}`);
+    console.log(`HTTPS Server is running on https://127.0.0.1:${PORT_WS_HTTPS}`);
 });
 
 // Interface de linha de comando (CLI) para enviar comandos
