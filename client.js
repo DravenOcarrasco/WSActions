@@ -11,69 +11,88 @@
 (function () {
     'use strict';
 
-    // Incluindo a biblioteca jQuery, SweetAlert e Socket.IO diretamente no script
-    const jqueryScript = document.createElement('script');
-    jqueryScript.src = 'https://code.jquery.com/jquery-3.6.0.min.js';
-    document.head.appendChild(jqueryScript);
-
-    const sweetAlertScript = document.createElement('script');
-    sweetAlertScript.src = 'https://cdn.jsdelivr.net/npm/sweetalert2@11';
-    document.head.appendChild(sweetAlertScript);
-
-    const socketScript = document.createElement('script');
-    socketScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.0/socket.io.js'; // Caminho para a biblioteca Socket.IO
-    document.head.appendChild(socketScript);
-
     // Função para adicionar um script ao documento
     function addScript(src) {
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = () => {
-            console.info(`EXT_DONE: ${src}`);
-        };
-        script.onerror = () => {
-            console.error(`Erro ao carregar ${src}`);
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro ao carregar extensão',
-                text: `Não foi possível carregar a extensão do URL: ${src}`,
-                confirmButtonText: 'Ok'
-            });
-        };
-        document.head.appendChild(script);
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.onload = () => {
+                console.info(`EXT_DONE: ${src}`);
+                resolve();
+            };
+            script.onerror = () => {
+                console.error(`Erro ao carregar ${src}`);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro ao carregar extensão',
+                    text: `Não foi possível carregar a extensão do URL: ${src}`,
+                    confirmButtonText: 'Ok'
+                });
+                reject(new Error(`Erro ao carregar ${src}`));
+            };
+            document.head.appendChild(script);
+        });
     }
 
-    function loadEnabledExtensions() {
-        return fetch('https://127.0.0.1:9515/extensions')
-            .then(response => response.json())
-            .then(data => data.ENABLED)
-            .catch(error => {
-                console.error('Erro ao carregar extensões:', error);
-                setTimeout(()=>{
-                    window.open("https://127.0.0.1:9515/extensions", '_blank');
-                }, 5000)
-                return [];
-            });
+    async function loadExtension(extension){
+        const scriptUrl = `https://127.0.0.1:9515/${extension.NAME}/client`;
+        addScript(scriptUrl).then(()=>{
+            
+        }).catch(()=>{
+
+        });
     }
 
-    loadEnabledExtensions().then(enabledExtensions => {
-        console.log(enabledExtensions)
-        if (enabledExtensions.length === 0) {
-            console.log('Nenhuma extensão habilitada encontrada.');
-            return;
+    // Carrega as bibliotecas necessárias
+    async function loadLibraries() {
+        const libraries = [
+            'https://code.jquery.com/jquery-3.6.0.min.js',
+            'https://cdn.jsdelivr.net/npm/sweetalert2@11',
+            'https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.0/socket.io.js'
+        ];
+
+        try {
+            await Promise.all(libraries.map(addScript));
+            console.info('Todas as bibliotecas foram carregadas com sucesso.');
+        } catch (error) {
+            console.error('Erro ao carregar as bibliotecas:', error);
         }
+    }
 
-        // Espera 10 segundos antes de começar a carregar as extensões
-        setTimeout(() => {
-            // Carrega os scripts das extensões habilitadas
-            enabledExtensions.forEach(extension => {
-                if (extension.CLIENT_LINK) {
-                    const scriptUrl = `https://127.0.0.1:9515/${extension.CLIENT_LINK}`;
-                    addScript(scriptUrl);
-                }
-            });
+    // Função para carregar as extensões habilitadas
+    async function loadEnabledExtensions() {
+        try {
+            const response = await fetch('https://127.0.0.1:9515/extensions');
+            const data = await response.json();
+            const enabledExtensions = data.ENABLED || [];
+
+            if (enabledExtensions.length === 0) {
+                console.log('Nenhuma extensão habilitada encontrada.');
+                return;
+            }
+
             console.log('Extensões habilitadas:', enabledExtensions);
-        }, 5000); // 5 segundos de atraso
-    })
+
+            // Espera 10 segundos antes de começar a carregar as extensões
+            await new Promise(resolve => setTimeout(resolve, 10000));
+
+            // Carrega os scripts das extensões habilitadas
+            await Promise.all(enabledExtensions.map(extension => {
+                loadExtension(extension)
+            }));
+
+        } catch (error) {
+            console.error('Erro ao carregar extensões:', error);
+            setTimeout(() => {
+                window.open('https://127.0.0.1:9515/extensions', '_blank');
+            }, 5000);
+        }
+    }
+
+    // Executa o carregamento das bibliotecas e extensões
+    (async function init() {
+        await loadLibraries();
+        await loadEnabledExtensions();
+    })();
 
 })();

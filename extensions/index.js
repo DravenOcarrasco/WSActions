@@ -105,6 +105,16 @@ const ModuleController = (() => {
                                 }
                             });
                         });
+
+                        APP.get(`/${EXT.NAME}/icon`, (req, res) => {
+                            const filePath = path.resolve(process.execDir, 'extensions', EXT.NAME, './icon.png'); // Ajuste o caminho conforme necessário
+                            res.sendFile(filePath, (err) => {
+                                if (err) {
+                                    res.status(500).send(`${filePath} not found`);
+                                }
+                            });
+                        });
+
                         APP.use(`/${EXT.NAME}`, EXT.ROUTER);
                     } catch (error) {
                         console.error(error);
