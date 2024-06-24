@@ -18,6 +18,10 @@ const ModuleController = (() => {
         CLI: {},
     };
 
+    const STORAGE = {
+
+    }
+
     /**
      * Inicializa o controlador de módulos, definindo o APP e WSIO,
      * criando o diretório de extensões, se necessário, e carregando as extensões.
@@ -39,6 +43,7 @@ const ModuleController = (() => {
                 socket.on(`${EXT.NAME}.${event}`, handler._function);
             }
         }
+        // socket.on(`${EXT.NAME}.`)
     }
 
     /**

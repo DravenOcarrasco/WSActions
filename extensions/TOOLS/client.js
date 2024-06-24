@@ -10,8 +10,17 @@
 
 (function () {
     const MODULE_NAME = "TOOLS"
-    
     const socket = io('https://127.0.0.1:9515/', { secure: true }); // Conexão segura via HTTPS
+
+    const getStorage = async ()=>{
+        
+    }
+    
+    const setStorage = async ()=>{
+
+    }
+
+    
     let isMaster = false; // Variável para controlar se o cliente é o mestre
     let maxDelay = 2000; // Tempo máximo de atraso em milissegundos
     const actionQueue = []; // Fila de ações

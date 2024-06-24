@@ -13,11 +13,11 @@ if (process.execPath.indexOf("bun.exe") > 0 || process.execPath.indexOf("node.ex
 } else {
     process.execDir = path.dirname(process.execPath);
 }
+require('./cli')
 
 const ModuleController = require('../extensions')
 const PORT_WS_HTTP = 9514;
 const PORT_WS_HTTPS = 9515;
-const PORT_HTTP = 8080;
 const keyPath = path.resolve(process.execDir, 'key.pem');
 const certPath = path.resolve(process.execDir, 'certificate.pem');
 
@@ -68,11 +68,9 @@ io.attach(httpsServerWS);
 const connectedClients = new Set(); // Usando Set para armazenar clientes conectados
 
 io.on('connection', (socket) => {
-    // console.log('Um cliente se conectou:', socket.id);
     connectedClients.add(socket);
     ModuleController.initIoToSocket(socket)
     socket.on('disconnect', () => {
-        // console.log('Cliente desconectado:', socket.id);
         connectedClients.delete(socket);
     });
 });

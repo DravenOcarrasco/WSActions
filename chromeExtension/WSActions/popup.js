@@ -73,10 +73,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (identifier) {
             console.log('Identificador armazenado:', identifier);
             document.getElementById('deviceId').innerText = identifier;
+            window.identifier = identifier
         } else {
             const newIdentifier = generateIdentifier();
             storeIdentifier(newIdentifier);
-            document.getElementById('deviceId').innerText = newIdentifier;
+            window.identifier = newIdentifier
             console.log('Novo identificador gerado e armazenado:', newIdentifier);
         }
     });
