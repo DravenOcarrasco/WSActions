@@ -1,3 +1,5 @@
+const defaultPort = 9514;
+const defaultDelay = 1000;
 // Função para gerar um identificador único
 function generateIdentifier() {
     return Math.random().toString(36).substr(2, 16);
@@ -76,7 +78,9 @@ document.addEventListener('DOMContentLoaded', function () {
             window.identifier = identifier
         } else {
             const newIdentifier = generateIdentifier();
-            storeIdentifier(newIdentifier);
+            storeIdentifier(newIdentifier);    
+            storeServicePort(defaultPort);
+            storeScriptDelay(defaultDelay);
             window.identifier = newIdentifier
             console.log('Novo identificador gerado e armazenado:', newIdentifier);
         }

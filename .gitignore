@@ -178,3 +178,4 @@ dist
 .DS_Store
 /build
 /bin
+storage.json

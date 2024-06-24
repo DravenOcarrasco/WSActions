@@ -2,14 +2,14 @@ const fs = require('fs');
 const path = require('path');
 
 function createExtension(name) {
-    const extensionDir = path.join(process.execDir, 'extensions', name);
+    const extensionDir = path.join(process.cwd(), 'extensions', name);
     
     if (fs.existsSync(extensionDir)) {
         console.log(`A extensão ${name} já existe.`);
         return;
     }
     
-    fs.mkdirSync(extensionDir);
+    fs.mkdirSync(extensionDir, { recursive: true });
     
     const indexFileContent = `
 module.exports = (WSIO, APP, RL, EXPRESS) => {
@@ -55,20 +55,60 @@ module.exports = (WSIO, APP, RL, EXPRESS) => {
     `;
 
     const clientFileContent = `
-(function () {
+(async function () {
     const MODULE_NAME = "${name.toUpperCase()}";
     const socket = io('https://127.0.0.1:9515/', { secure: true });
 
-    function exampleFunction() {
-        console.log('Example function executed.');
-    }
+    const setStorage = async (key, value) => {
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('Timeout: A operação demorou mais de 10 segundos.'));
+            }, 10000);
+
+            socket.on(\`storage.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`, (data) => {
+                clearTimeout(timeout);
+                resolve(data);
+            });
+
+            socket.emit('storage.store', {
+                extension: MODULE_NAME,
+                id: window.identifier,
+                key, 
+                value,
+                response: \`storage.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`
+            });
+        });
+    };
+
+    const getStorage = async (key) => {
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('Timeout: A operação demorou mais de 10 segundos.'));
+            }, 10000);
+
+            socket.on(\`storage.load.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`, (data) => {
+                clearTimeout(timeout);
+                if (data.success) {
+                    resolve(data.value);
+                } else {
+                    reject(new Error('Erro ao carregar o armazenamento'));
+                }
+            });
+
+            socket.emit('storage.load', {
+                extension: MODULE_NAME,
+                id: window.identifier,
+                key,
+                response: \`storage.load.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`
+            });
+        });
+    };
 
     socket.on('connect', () => {
         console.log('Connected to WebSocket server');
 
         socket.on(\`\${MODULE_NAME}:event\`, (data) => {
             console.log('Received event:', data);
-            exampleFunction();
         });
     });
 
@@ -78,8 +118,8 @@ module.exports = (WSIO, APP, RL, EXPRESS) => {
 })();
     `;
 
-    fs.writeFileSync(path.join(extensionDir, 'index.js'), indexFileContent);
-    fs.writeFileSync(path.join(extensionDir, 'client.js'), clientFileContent);
+    fs.writeFileSync(path.join(extensionDir, 'index.js'), indexFileContent.trim());
+    fs.writeFileSync(path.join(extensionDir, 'client.js'), clientFileContent.trim());
 
     console.log(`Extensão ${name} criada com sucesso em ${extensionDir}.`);
 }

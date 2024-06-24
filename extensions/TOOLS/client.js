@@ -1,26 +1,52 @@
-// ==UserScript==
-// @name         WebSocket Client for Tampermonkey
-// @namespace    http://tampermonkey.net/
-// @version      0.13
-// @description  Connects to a secure WebSocket server and performs actions based on commands received
-// @author       Your Name
-// @match        *://*/*
-// @grant        none
-// ==/UserScript==
-
-(function () {
+(async function () {
     const MODULE_NAME = "TOOLS"
     const socket = io('https://127.0.0.1:9515/', { secure: true }); // Conexão segura via HTTPS
 
-    const getStorage = async ()=>{
-        
-    }
+    const setStorage = async (key, value) => {
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('Timeout: A operação demorou mais de 10 segundos.'));
+            }, 10000);
     
-    const setStorage = async ()=>{
-
-    }
-
+            socket.on(`storage.res.${MODULE_NAME}.${window.identifier}.${key}`, (data) => {
+                clearTimeout(timeout);
+                resolve(data);
+            });
     
+            socket.emit('storage.store', {
+                extension: MODULE_NAME,
+                id: window.identifier,
+                key, 
+                value,
+                response: `storage.res.${MODULE_NAME}.${window.identifier}.${key}`
+            });
+        });
+    };
+    
+    const getStorage = async (key) => {
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('Timeout: A operação demorou mais de 10 segundos.'));
+            }, 10000);
+    
+            socket.on(`storage.load.res.${MODULE_NAME}.${window.identifier}.${key}`, (data) => {
+                clearTimeout(timeout);
+                if (data.success) {
+                    resolve(data.value);
+                } else {
+                    reject(new Error('Erro ao carregar o armazenamento'));
+                }
+            });
+    
+            socket.emit('storage.load', {
+                extension: MODULE_NAME,
+                id: window.identifier,
+                key,
+                response: `storage.load.res.${MODULE_NAME}.${window.identifier}.${key}`
+            });
+        });
+    };
+
     let isMaster = false; // Variável para controlar se o cliente é o mestre
     let maxDelay = 2000; // Tempo máximo de atraso em milissegundos
     const actionQueue = []; // Fila de ações
