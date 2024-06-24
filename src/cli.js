@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const yargs = require('yargs');
 
 function createExtension(name) {
     const extensionDir = path.join(process.cwd(), 'extensions', name);
@@ -60,41 +61,41 @@ module.exports = (WSIO, APP, RL, EXPRESS) => {
     const socket = io('https://127.0.0.1:9515/', { secure: true });
 
     const setStorage = async (key, value) => {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             const timeout = setTimeout(() => {
-                reject(new Error('Timeout: A operação demorou mais de 10 segundos.'));
+                resolve({ success: false, error: 'Timeout: A operação demorou mais de 10 segundos.' });
             }, 10000);
-
-            socket.on(\`storage.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`, (data) => {
+    
+            socket.on(\`storage.store.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`, (data) => {
                 clearTimeout(timeout);
                 resolve(data);
             });
-
+    
             socket.emit('storage.store', {
                 extension: MODULE_NAME,
                 id: window.identifier,
-                key, 
+                key,
                 value,
-                response: \`storage.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`
+                response: \`storage.store.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`
             });
         });
     };
-
+    
     const getStorage = async (key) => {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             const timeout = setTimeout(() => {
-                reject(new Error('Timeout: A operação demorou mais de 10 segundos.'));
+                resolve({ success: false, error: 'Timeout: A operação demorou mais de 10 segundos.' });
             }, 10000);
-
+    
             socket.on(\`storage.load.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`, (data) => {
                 clearTimeout(timeout);
                 if (data.success) {
-                    resolve(data.value);
+                    resolve(data);
                 } else {
-                    reject(new Error('Erro ao carregar o armazenamento'));
+                    resolve({ success: false, error: 'Erro ao carregar o armazenamento' });
                 }
             });
-
+    
             socket.emit('storage.load', {
                 extension: MODULE_NAME,
                 id: window.identifier,
@@ -102,6 +103,18 @@ module.exports = (WSIO, APP, RL, EXPRESS) => {
                 response: \`storage.load.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`
             });
         });
+    };
+    
+    const getVariable = async (variableName, defaultValue, create = false) => {
+        const data = await getStorage(variableName);
+        if (!data.success && create) {
+            await setStorage(variableName, defaultValue);
+            return defaultValue;
+        } else if (data.success) {
+            return data.value;
+        } else {
+            return defaultValue;
+        }
     };
 
     socket.on('connect', () => {
@@ -124,9 +137,6 @@ module.exports = (WSIO, APP, RL, EXPRESS) => {
     console.log(`Extensão ${name} criada com sucesso em ${extensionDir}.`);
 }
 
-// Configuração do yargs
-const yargs = require('yargs');
-
 yargs.command({
     command: 'create-extension',
     describe: 'Cria uma nova extensão',
@@ -142,4 +152,5 @@ yargs.command({
         process.exit(0); // Sair após a execução do comando
     }
 });
+
 yargs.parse();

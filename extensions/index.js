@@ -180,21 +180,21 @@ const ModuleController = (() => {
      * Salva o armazenamento no arquivo de armazenamento.
      */
     const saveStorage = () => {
-        fs.writeFileSync(storagePath, JSON.stringify(STORAGE, null, 2), 'utf8');
+        fs.writeFileSync(storagePath, JSON.stringify(STORAGE, null, 4), 'utf8');
     };
 
     // Função utilitária para acessar ou criar uma estrutura de dados aninhada
     const setNestedValue = (obj, keys, value) => {
         const lastKey = keys.pop();
         const lastObj = keys.reduce((obj, key) => 
-            obj[key] = obj[key] || {}, obj); 
+            obj[key] = obj[key] || {}, obj);
         lastObj[lastKey] = value;
         saveStorage(); // Salva o armazenamento após definir o valor
     };
 
     const getNestedValue = (obj, keys) => {
         return keys.reduce((obj, key) => 
-            (obj && obj[key] !== 'undefined') ? obj[key] : undefined, obj);
+            (obj && obj[key] !== undefined) ? obj[key] : undefined, obj);
     };
 
     const deleteNestedValue = (obj, keys) => {
@@ -232,7 +232,11 @@ const ModuleController = (() => {
 
             socket.on('storage.load', (data) => {
                 const value = storageHandlers.load(data);
-                socket.emit(data.response, { success: true, value });
+                if (value === undefined) {
+                    socket.emit(data.response, { success: false });
+                } else {
+                    socket.emit(data.response, { success: true, value });
+                }
             });
 
             socket.on('storage.delete', (data) => {
