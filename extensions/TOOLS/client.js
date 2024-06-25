@@ -1,7 +1,7 @@
 (async function () {
     const MODULE_NAME = "TOOLS";
     const DEFAULT_MAX_DELAY = 1000; // Valor padrão de maxDelay em milissegundos
-    const socket = io('https://127.0.0.1:9515/', { secure: true }); // Conexão segura via HTTPS
+    const socket = io('http://127.0.0.1:9514/', { secure: false }); // Conexão segura via HTTPS
 
     const setStorage = async (key, value) => {
         return new Promise((resolve) => {

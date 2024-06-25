@@ -35,7 +35,7 @@
     }
 
     async function loadExtension(extension){
-        const scriptUrl = `https://127.0.0.1:9515/${extension.NAME}/client`;
+        const scriptUrl = `http://127.0.0.1:9514/${extension.NAME}/client`;
         addScript(scriptUrl).then(()=>{
             
         }).catch(()=>{
@@ -62,7 +62,7 @@
     // Função para carregar as extensões habilitadas
     async function loadEnabledExtensions() {
         try {
-            const response = await fetch('https://127.0.0.1:9515/extensions');
+            const response = await fetch('http://127.0.0.1:9514/extensions');
             const data = await response.json();
             const enabledExtensions = data.ENABLED || [];
 
@@ -84,7 +84,7 @@
         } catch (error) {
             console.error('Erro ao carregar extensões:', error);
             setTimeout(() => {
-                window.open('https://127.0.0.1:9515/extensions', '_blank');
+                window.open('http://127.0.0.1:9514/extensions', '_blank');
             }, 5000);
         }
     }

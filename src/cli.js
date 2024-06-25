@@ -71,7 +71,7 @@ module.exports = (WSIO, APP, RL, STORAGE, EXPRESS) => {
     const clientFileContent = `
 (async function () {
     const MODULE_NAME = "${name.toUpperCase()}";
-    const socket = io('https://127.0.0.1:9515/', { secure: true });
+    const socket = io('http://127.0.0.1:9514/', { secure: true });
 
     const setStorage = async (key, value) => {
         return new Promise((resolve) => {

@@ -24,19 +24,19 @@ const certPath = path.resolve(process.execDir, 'certificate.pem');
 console.log(`EXT_PATH: ${path.resolve(process.execDir, 'extensions')}`)
 
 // Função para criar certificados se não existirem
-function generateCertificates() {
-    if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
-        console.log('Certificados não encontrados. Gerando certificados autoassinados...');
-        execSync(`openssl genrsa -out ${keyPath} 2048`);
-        execSync(`openssl req -new -key ${keyPath} -out csr.pem -subj "/CN=localhost"`);
-        execSync(`openssl x509 -req -days 365 -in csr.pem -signkey ${keyPath} -out ${certPath}`);
-        fs.unlinkSync('csr.pem'); // Remover CSR após a criação do certificado
-        console.log('Certificados gerados.');
-    }
-}
+// function generateCertificates() {
+//     if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
+//         console.log('Certificados não encontrados. Gerando certificados autoassinados...');
+//         execSync(`openssl genrsa -out ${keyPath} 2048`);
+//         execSync(`openssl req -new -key ${keyPath} -out csr.pem -subj "/CN=localhost"`);
+//         execSync(`openssl x509 -req -days 365 -in csr.pem -signkey ${keyPath} -out ${certPath}`);
+//         fs.unlinkSync('csr.pem'); // Remover CSR após a criação do certificado
+//         console.log('Certificados gerados.');
+//     }
+// }
 
 // Gerar certificados se necessário
-generateCertificates();
+// generateCertificates();
 
 // Inicializando o Express
 const app = express();
@@ -50,11 +50,11 @@ app.use(cors());
 
 // Inicializando servidores HTTP e HTTPS para WebSocket
 const httpServerWS = http.createServer(app);
-const httpsOptionsWS = {
-    key: fs.readFileSync(keyPath),
-    cert: fs.readFileSync(certPath),
-};
-const httpsServerWS = https.createServer(httpsOptionsWS, app);
+// const httpsOptionsWS = {
+//     key: fs.readFileSync(keyPath),
+//     cert: fs.readFileSync(certPath),
+// };
+// const httpsServerWS = https.createServer(httpsOptionsWS, app);
 
 // Inicializando o Socket.IO para ambos os servidores
 const io = socketIo({
@@ -63,7 +63,7 @@ const io = socketIo({
     }
 });
 io.attach(httpServerWS);
-io.attach(httpsServerWS);
+// io.attach(httpsServerWS);
 
 const connectedClients = new Set(); // Usando Set para armazenar clientes conectados
 
@@ -80,9 +80,9 @@ httpServerWS.listen(PORT_WS_HTTP, () => {
     console.log(`HTTP Server is running on http://127.0.0.1:${PORT_WS_HTTP}`);
 });
 
-httpsServerWS.listen(PORT_WS_HTTPS, () => {
-    console.log(`HTTPS Server is running on https://127.0.0.1:${PORT_WS_HTTPS}`);
-});
+// httpsServerWS.listen(PORT_WS_HTTPS, () => {
+//     console.log(`HTTPS Server is running on http://127.0.0.1:${PORT_WS_HTTPS}`);
+// });
 
 // Interface de linha de comando (CLI) para enviar comandos
 const rl = readline.createInterface({
