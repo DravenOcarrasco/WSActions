@@ -13,7 +13,20 @@ function createExtension(name) {
     fs.mkdirSync(extensionDir, { recursive: true });
     
     const indexFileContent = `
-module.exports = (WSIO, APP, RL, EXPRESS) => {
+/**
+ * Módulo da extensão.
+ * 
+ * @param {Object} WSIO - Instância do WebSocket IO.
+ * @param {Object} APP - Instância do Express.
+ * @param {Object} RL - Instância do Readline.
+ * @param {Object} STORAGE - Objeto de armazenamento compartilhado.
+ * @param {Object} STORAGE.data - Objeto de armazenamento.
+ * @param {Function} STORAGE.save - Função para salvar o armazenamento.
+ * @param {Object} EXPRESS - Classe Express.
+ * 
+ * @returns {Object} - Objeto da extensão.
+ */
+module.exports = (WSIO, APP, RL, STORAGE, EXPRESS) => {
     const ROUTER = EXPRESS.Router();
     const NAME = "${name.toUpperCase()}";
     const ENABLED = true;

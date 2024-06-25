@@ -10,7 +10,7 @@
   },
   "scripts": {
     "start": "bun run src/main.js",
-    "build": "bun build src/main.js --outfile=dist/server --compile"
+    "build": "bun build src/main.js --outfile=build/server --compile"
   },
   "dependencies": {
     "cors": "^2.8.5",

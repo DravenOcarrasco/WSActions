@@ -89,7 +89,7 @@ const ModuleController = (() => {
                 if (typeof extensionModule === 'function') {
                     let EXT = {};
                     try {
-                        EXT = extensionModule(WSIO, APP, RL, express);
+                        EXT = extensionModule(WSIO, APP, RL, { data:STORAGE, save:saveStorage}, express);
                         console.log(`Extensão carregada: ${EXT.NAME}`);
                     
                         if (EXT.ENABLED) {
