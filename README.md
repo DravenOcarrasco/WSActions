@@ -60,7 +60,7 @@ Para iniciar o servidor de desenvolvimento, execute:
 bun run start
 ```
 
-Abra [https://127.0.0.1:9515](https://127.0.0.1:9515) para ver o projeto em execução.
+Abra [http://127.0.0.1:9514](http://127.0.0.1:9514) para ver o projeto em execução.
 
 ### Compilação
 
@@ -113,7 +113,7 @@ Os arquivos compilados serão gerados na pasta `dist`.
 
 4. Salve e habilite o script no Tampermonkey.
 
-5. Acesse a página [https://127.0.0.1:9515/extensions](https://127.0.0.1:9515/extensions) para permitir o acesso ao HTTPS auto-assinado.
+5. Acesse a página [http://127.0.0.1:9514/extensions](http://127.0.0.1:9514/extensions) para permitir o acesso ao HTTPS auto-assinado.
 
 ## Contribuição
 

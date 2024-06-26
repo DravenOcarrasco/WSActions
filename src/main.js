@@ -13,30 +13,30 @@ if (process.execPath.indexOf("bun.exe") > 0 || process.execPath.indexOf("node.ex
 } else {
     process.execDir = path.dirname(process.execPath);
 }
+require('./cli')
 
 const ModuleController = require('../extensions')
 const PORT_WS_HTTP = 9514;
 const PORT_WS_HTTPS = 9515;
-const PORT_HTTP = 8080;
 const keyPath = path.resolve(process.execDir, 'key.pem');
 const certPath = path.resolve(process.execDir, 'certificate.pem');
 
-console.log(`EXT_PATH:${path.resolve(process.execDir, 'extensions')}`)
+console.log(`EXT_PATH: ${path.resolve(process.execDir, 'extensions')}`)
 
 // Função para criar certificados se não existirem
-function generateCertificates() {
-    if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
-        console.log('Certificados não encontrados. Gerando certificados autoassinados...');
-        execSync(`openssl genrsa -out ${keyPath} 2048`);
-        execSync(`openssl req -new -key ${keyPath} -out csr.pem -subj "/CN=localhost"`);
-        execSync(`openssl x509 -req -days 365 -in csr.pem -signkey ${keyPath} -out ${certPath}`);
-        fs.unlinkSync('csr.pem'); // Remover CSR após a criação do certificado
-        console.log('Certificados gerados.');
-    }
-}
+// function generateCertificates() {
+//     if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
+//         console.log('Certificados não encontrados. Gerando certificados autoassinados...');
+//         execSync(`openssl genrsa -out ${keyPath} 2048`);
+//         execSync(`openssl req -new -key ${keyPath} -out csr.pem -subj "/CN=localhost"`);
+//         execSync(`openssl x509 -req -days 365 -in csr.pem -signkey ${keyPath} -out ${certPath}`);
+//         fs.unlinkSync('csr.pem'); // Remover CSR após a criação do certificado
+//         console.log('Certificados gerados.');
+//     }
+// }
 
 // Gerar certificados se necessário
-generateCertificates();
+// generateCertificates();
 
 // Inicializando o Express
 const app = express();
@@ -50,11 +50,11 @@ app.use(cors());
 
 // Inicializando servidores HTTP e HTTPS para WebSocket
 const httpServerWS = http.createServer(app);
-const httpsOptionsWS = {
-    key: fs.readFileSync(keyPath),
-    cert: fs.readFileSync(certPath),
-};
-const httpsServerWS = https.createServer(httpsOptionsWS, app);
+// const httpsOptionsWS = {
+//     key: fs.readFileSync(keyPath),
+//     cert: fs.readFileSync(certPath),
+// };
+// const httpsServerWS = https.createServer(httpsOptionsWS, app);
 
 // Inicializando o Socket.IO para ambos os servidores
 const io = socketIo({
@@ -63,35 +63,26 @@ const io = socketIo({
     }
 });
 io.attach(httpServerWS);
-io.attach(httpsServerWS);
+// io.attach(httpsServerWS);
 
 const connectedClients = new Set(); // Usando Set para armazenar clientes conectados
 
 io.on('connection', (socket) => {
-    // console.log('Um cliente se conectou:', socket.id);
     connectedClients.add(socket);
     ModuleController.initIoToSocket(socket)
     socket.on('disconnect', () => {
-        // console.log('Cliente desconectado:', socket.id);
         connectedClients.delete(socket);
     });
 });
 
 // Iniciando os servidores WebSocket
 httpServerWS.listen(PORT_WS_HTTP, () => {
-    console.log(`WebSocket HTTP Server is running on http://127.0.0.1:${PORT_WS_HTTP}`);
+    console.log(`HTTP Server is running on http://127.0.0.1:${PORT_WS_HTTP}`);
 });
 
-httpsServerWS.listen(PORT_WS_HTTPS, () => {
-    console.log(`WebSocket HTTPS Server is running on https://127.0.0.1:${PORT_WS_HTTPS}`);
-});
-
-// Servidor HTTP usando Express para servir arquivos estáticos
-const httpServer = http.createServer(app);
-
-httpServer.listen(PORT_HTTP, () => {
-    console.log(`HTTP Server is running on http://127.0.0.1:${PORT_HTTP}`);
-});
+// httpsServerWS.listen(PORT_WS_HTTPS, () => {
+//     console.log(`HTTPS Server is running on http://127.0.0.1:${PORT_WS_HTTPS}`);
+// });
 
 // Interface de linha de comando (CLI) para enviar comandos
 const rl = readline.createInterface({

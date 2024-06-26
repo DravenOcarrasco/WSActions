@@ -1,7 +1,7 @@
 {
   "name": "wsaction",
   "module": "index.ts",
-  "type": "module",
+  "type": "commonjs",
   "devDependencies": {
     "@types/bun": "latest"
   },
@@ -10,12 +10,13 @@
   },
   "scripts": {
     "start": "bun run src/main.js",
-    "build": "bun build src/main.js --outfile=dist/server --compile"
+    "build": "bun build src/main.js --outfile=build/server --compile"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "cpx": "^1.5.0",
     "express": "^4.19.2",
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.7.5",
+    "yargs": "^17.7.2"
   }
 }

@@ -1,16 +1,26 @@
 const fs = require('fs');
 const path = require('path');
 
-module.exports = (WSIO, APP, RL, EXPRESS) => {
+/**
+ * Módulo da extensão.
+ * 
+ * @param {Object} WSIO - Instância do WebSocket IO.
+ * @param {Object} APP - Instância do Express.
+ * @param {Object} RL - Instância do Readline.
+ * @param {Object} STORAGE - Objeto de armazenamento compartilhado.
+ * @param {Object} STORAGE.data - Objeto de armazenamento.
+ * @param {Function} STORAGE.save - Função para salvar o armazenamento.
+ * @param {Object} EXPRESS - Classe Express.
+ * 
+ * @returns {Object} - Objeto da extensão.
+ */
+module.exports = (WSIO, APP, RL, STORAGE, EXPRESS) => {
     // Cria um novo roteador para a extensão
     const ROUTER = EXPRESS.Router();
-    
     // Nome da extensão
     const NAME = "TOOLS";
-    
     // Estado de habilitação da extensão
     const ENABLED = true;
-
     // Definição de eventos IO específicos para esta extensão
     const IOEVENTS = {
         "master:command": {
@@ -20,10 +30,9 @@ module.exports = (WSIO, APP, RL, EXPRESS) => {
             }
         }
     };
-
     const COMMANDS = {
         "openPage": {
-            description: "Envia o sinal para os nanegadores abrirem a pagina informada",
+            description: "Envia o sinal para os navegadores abrirem a pagina informada",
             _function: (data) => {
                 RL.question('Digite a URL da página para abrir: ', (url) => {
                     WSIO.emit(`${NAME}:command`, { command: 'browser:openPage', payload: url });
@@ -46,7 +55,6 @@ module.exports = (WSIO, APP, RL, EXPRESS) => {
             }
         }
     }
-
     /**
      * Função de inicialização da extensão.
      */
@@ -63,18 +71,7 @@ module.exports = (WSIO, APP, RL, EXPRESS) => {
         console.error(`${NAME} error: ${error.message}`);
         // Lógica adicional de tratamento de erros
     };
-
-    // Define a rota para retornar o arquivo client.js
-    ROUTER.get("/client", (req, res) => {
-        const filePath = path.resolve(process.execDir, 'extensions', 'NAME', './client.js'); // Ajuste o caminho conforme necessário
-        res.sendFile(filePath, (err) => {
-            if (err) {
-                res.status(500).send('Erro ao carregar o arquivo.');
-            }
-        });
-    });
     const CLIENT_LINK=`${NAME}/client`
-
     return {
         NAME,
         ROUTER,

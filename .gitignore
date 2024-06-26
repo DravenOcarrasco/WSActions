@@ -2,6 +2,9 @@
 
 # Logs
 
+certificate.pem
+key.pem
+
 logs
 _.log
 npm-debug.log_
@@ -173,3 +176,6 @@ dist
 
 # Finder (MacOS) folder config
 .DS_Store
+/build
+/bin
+storage.json
