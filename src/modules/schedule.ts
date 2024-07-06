@@ -2,11 +2,10 @@ import schedule from 'node-schedule';
 import fs from 'fs';
 import path from 'path';
 import logger from './logger';
-import { ChromeManager } from '../chromeManager';
+import ChromeManager from '../chromeManager';
 import { loadConfig } from '../config'; // Certifique-se de que o caminho está correto
 
 const config = loadConfig();
-const chromeManager = new ChromeManager(config.chromeProfilePath);
 
 interface ScheduledTask {
     name: string;
@@ -56,7 +55,7 @@ const loadSchedules = (): ScheduledTask[] => {
 // Função para abrir um perfil do Chrome e injetar scripts
 const openProfile = async (profileName: string, scripts: string[]) => {
     try {
-        const instance = await chromeManager.launchProfilesByName(profileName);
+        const instance = await ChromeManager.launchProfilesByName(profileName);
         // Para injetar os scripts na página aberta
         for (const script of scripts) {
             const scriptPath = path.resolve(config.scriptsPath, script);

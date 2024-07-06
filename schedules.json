@@ -1,32 +1,3 @@
 [
-    {
-        "name": "EveryFiveMinutes",
-        "profiles": [
-            "BLOCK30"
-        ],
-        "scripts": [
-            "script1.js"
-        ],
-        "schedule": "*/5 * * * *"
-    },
-    {
-        "name": "MorningRoutine",
-        "profiles": [
-            "BLOCK30"
-        ],
-        "scripts": [
-            "script1.js"
-        ],
-        "schedule": "0 8 * * *"
-    },
-    {
-        "name": "MiddayCheck",
-        "profiles": [
-            "BLOCK30"
-        ],
-        "scripts": [
-            "script3.js"
-        ],
-        "schedule": "0 12 * * *"
-    }
+    
 ]

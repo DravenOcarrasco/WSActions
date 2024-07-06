@@ -7,6 +7,7 @@ interface Config {
     chromeProfilePath: string;
     scriptsPath: string;
     defaultPageUrl: string;
+    chromeExecutablePath: string;
 }
 
 // Obtém o diretório do usuário atual
@@ -16,7 +17,8 @@ const userHomeDir = os.homedir();
 const defaultConfig: Config = {
     chromeProfilePath: path.join(userHomeDir, 'AppData', 'Local', 'Google', 'Chrome', 'User Data'),
     scriptsPath: "./scripts/injector.js",
-    defaultPageUrl: "https://www.google.com"
+    defaultPageUrl: "https://www.google.com",
+    chromeExecutablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
 };
 
 // Função para carregar a configuração do arquivo config.json

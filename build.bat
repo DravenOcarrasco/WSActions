@@ -31,3 +31,4 @@ if exist build\index.ts (
 )
 
 echo Build process completed.
+pause

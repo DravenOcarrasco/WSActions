@@ -1,5 +1,7 @@
 # Based on https://raw.githubusercontent.com/github/gitignore/main/Node.gitignore
 
+.vscode
+
 # Logs
 
 certificate.pem
@@ -181,3 +183,6 @@ dist
 storage.json
 
 /src-build
+/profiles_data
+/profiles
+/shortcuts

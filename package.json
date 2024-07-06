@@ -16,6 +16,7 @@
     "@types/node": "^20.14.9",
     "@types/node-schedule": "^2.1.7",
     "@types/socket.io": "^3.0.2",
+    "@types/ws": "^8.5.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.2"
   },
@@ -29,7 +30,9 @@
     "puppeteer": "^22.12.1",
     "puppeteer-core": "^22.12.1",
     "socket.io": "^4.7.5",
+    "socket.io-client": "^4.7.5",
     "windows-shortcuts": "^0.1.6",
-    "winston": "^3.13.0"
+    "winston": "^3.13.0",
+    "ws": "^8.17.1"
   }
 }

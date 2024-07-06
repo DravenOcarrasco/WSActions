@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { ScriptInjector } from './scriptInjector';
 import { loadConfig } from './config'; // Importa a função de configuração
-import { ChromeProfileInfo } from './interfaces/ChromeProfileInfo';
+import { exec } from 'child_process';
 
 const scriptInjector = new ScriptInjector();
 const config = loadConfig(); // Carrega a configuração
@@ -13,210 +13,430 @@ interface ChromeInstance {
     page: Page;
 }
 
-export class ChromeManager {
-    private instances: ChromeInstance[] = [];
-    private profilePath: string;
+interface ChromeProfileInfo {
+    folder_name: string;
+    active_time: number;
+    avatar_icon: string;
+    background_apps: boolean;
+    default_avatar_fill_color: number;
+    default_avatar_stroke_color: number;
+    force_signin_profile_locked: boolean;
+    gaia_given_name?: string;
+    gaia_id?: string;
+    gaia_name?: string;
+    hosted_domain?: string;
+    is_consented_primary_account: boolean;
+    is_ephemeral: boolean;
+    is_using_default_avatar: boolean;
+    is_using_default_name: boolean;
+    managed_user_id?: string;
+    metrics_bucket_index: number;
+    name: string;
+    profile_highlight_color: number;
+    shortcut_name: string;
+    signin_with_credential_provider: boolean;
+    user_name?: string;
+    first_account_name_hash?: number;
+    gaia_picture_file_name?: string;
+    last_downloaded_gaia_picture_url_with_size?: string;
+    user_accepted_account_management?: boolean;
+    extensions: string[];
+}
 
-    constructor(profilePath: string) {
-        this.profilePath = profilePath;
+interface GroupInfo {
+    name: string;
+    profiles: string[];
+    extensions: string[];
+}
+
+interface ProfilesData {
+    profiles: ChromeProfileInfo[];
+    groups: GroupInfo[];
+    defaultExtensions: string[];
+}
+
+let instances: ChromeInstance[] = [];
+let profilePath: string;
+const profilesFileName = 'profiles.json';
+
+function initializeChromeManager(profileDirectory: string) {
+    profilePath = profileDirectory;
+    if (!fs.existsSync(profilePath)) {
+        fs.mkdirSync(profilePath, { recursive: true });
+        fs.mkdirSync(path.join(profilePath, 'extensions'), { recursive: true });
     }
+    initializeProfilesFile();
+}
 
-    // Launch a new Chrome instance
-    async launchChrome(profileDirectory?: string): Promise<ChromeInstance> {
-        const args = [
+function initializeProfilesFile() {
+    const profilesFilePath = path.join(profilePath, profilesFileName);
+    if (!fs.existsSync(profilesFilePath)) {
+        const initialData: ProfilesData = { profiles: [], groups: [], defaultExtensions: [] };
+        fs.writeFileSync(profilesFilePath, JSON.stringify(initialData, null, 2));
+    }
+}
+
+// Update the profiles.json file
+function updateProfilesFile(profileData: ProfilesData) {
+    const profilesFilePath = path.join(profilePath, profilesFileName);
+    fs.writeFileSync(profilesFilePath, JSON.stringify(profileData, null, 2));
+}
+
+// Get profiles data
+function getProfilesData(): ProfilesData {
+    const profilesFilePath = path.join(profilePath, profilesFileName);
+    const profilesContent = fs.readFileSync(profilesFilePath, 'utf-8');
+    return JSON.parse(profilesContent);
+}
+
+// Launch a new Chrome instance
+async function launchChrome(profileName: string, extensions: string[]): Promise<ChromeInstance> {
+    const extensionPaths = extensions.join(',');
+    const browser = await puppeteer.launch({
+        headless: false, // Set headless to false to open the browser with a UI
+        args: [
             '--disable-web-security', // Disable web security
             '--disable-features=IsolateOrigins,site-per-process', // Disable site isolation
             '--allow-running-insecure-content', // Allow running insecure content
             '--disable-features=TrustedTypes', // Disable TrustedTypes
-        ];
-        if (profileDirectory) {
-            args.push(`--profile-directory='${profileDirectory}'`);
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--enable-gpu',
+            `--disable-extensions-except=${extensionPaths}`
+        ],
+        executablePath: config.chromeExecutablePath,
+        userDataDir: path.join(profilePath, profileName)
+    });
+
+    browser.on('targetcreated', async (target) => {
+        const newPage = await target.page();
+        if (newPage) {
+            await setupPage(newPage, profileName);
         }
-        const browser = await puppeteer.launch({
-            headless: false, // Set headless to false to open the browser with a UI
-            userDataDir: this.profilePath, // Set Chrome profile path
-            args,
-        });
+    });
 
-        browser.on('targetcreated', async (target) => {
-            const newPage = await target.page();
-            if (newPage) {
-                await this.setupPage(newPage, profileDirectory);
-            }
-        });
+    const page = await browser.newPage();
 
-        const page = await browser.newPage();
-        
-        await page.goto(config.defaultPageUrl);
-        let pages = await browser.pages();
-        if (pages.length > 1) {
-            await pages[0].close();
-        }
-
-        await this.setupPage(page);
-
-        const instance = { browser, page };
-        this.instances.push(instance);
-        return instance;
+    await page.goto(config.defaultPageUrl);
+    let pages = await browser.pages();
+    if (pages.length > 1) {
+        await pages[0].close();
     }
 
-    // Setup page settings and script injection
-    private async setupPage(page: Page, profileDirectory?: string): Promise<void> {
-        await page.setBypassCSP(true); // Bypass CSP
-        await page.setViewport({ width: 1300, height: 720 })
-        page.on('framenavigated', async (frame) => {
-            if (frame === page.mainFrame()) {
-                if (profileDirectory) {
-                    await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileDirectory}'`);
-                }
-                await this.injectScript(page);
-            }
-        });
+    await setupPage(page, profileName);
 
-        page.on('framenavigationfailed', async (frame) => {
-            if (frame === page.mainFrame()) {
-                if (profileDirectory) {
-                    await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileDirectory}'`);
-                }
-                await this.injectScript(page);
-            }
-        });
+    const instance = { browser, page };
+    instances.push(instance);
+    return instance;
+}
 
-        if (profileDirectory) {
-            await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileDirectory}'`);
+// Setup page settings and script injection
+async function setupPage(page: Page, profileName: string): Promise<void> {
+    await page.setBypassCSP(true); // Bypass CSP
+    await page.setViewport({ width: 1300, height: 720 });
+    page.on('framenavigated', async (frame) => {
+        if (frame === page.mainFrame()) {
+            await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileName}'`);
+            await injectScript(page);
         }
-        await this.injectScript(page);
+    });
 
-        // Handle popups
-        page.on('popup', async (popupPage: Page | null) => {
-            if (popupPage) {
-                await this.setupPage(popupPage);
-            }
-        });
-    }
-
-    // Inject script into a page
-    private async injectScript(page: Page): Promise<void> {
-        try {
-            // let window:any;
-            // const scriptAlreadyInjected = await page.evaluate(() => {
-            //     if ((window as any).__scriptInjected) {
-            //         return true;
-            //     } else {
-            //         (window as any).__scriptInjected = true;
-            //         return false;
-            //     }
-            // });
-
-            // if (!scriptAlreadyInjected) {
-            //     await scriptInjector.injectScriptFromConsole(page, path.join(process.cwd(), config.scriptsPath));
-            //     //console.log('Script injected successfully into frame:', page.url());
-            // }
-            await scriptInjector.injectScriptFromConsole(page, path.join(process.cwd(), config.scriptsPath));
-        } catch (error) {
-            console.error('Error injecting script:', error);
+    page.on('framenavigationfailed', async (frame) => {
+        if (frame === page.mainFrame()) {
+            await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileName}'`);
+            await injectScript(page);
         }
-    }
+    });
 
-    // Close a specific Chrome instance
-    async closeChrome(instance: ChromeInstance): Promise<void> {
-        await instance.browser.close();
-        this.instances = this.instances.filter(i => i !== instance);
-    }
+    await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileName}'`);
+    await injectScript(page);
 
-    // Close all Chrome instances
-    async closeAll(): Promise<void> {
-        for (const instance of this.instances) {
-            await instance.browser.close();
+    // Handle popups
+    page.on('popup', async (popupPage: Page | null) => {
+        if (popupPage) {
+            await setupPage(popupPage, profileName);
         }
-        this.instances = [];
-    }
+    });
+}
 
-    // Get all active instances
-    getInstances(): ChromeInstance[] {
-        return this.instances;
-    }
-
-    // List all profiles
-    listProfiles(): ChromeProfileInfo[] {
-        const localStatePath = path.join(this.profilePath, 'Local State');
-        if (!fs.existsSync(localStatePath)) {
-            throw new Error(`Local State file not found: ${localStatePath}`);
-        }
-
-        const localStateContent = fs.readFileSync(localStatePath, 'utf-8');
-        const localStateJson = JSON.parse(localStateContent);
-
-        if (!localStateJson.profile || !localStateJson.profile.info_cache) {
-            throw new Error('Invalid Local State format');
-        }
-
-        const profiles: ChromeProfileInfo[] = [];
-        for (const key in localStateJson.profile.info_cache) {
-            profiles.push({
-                ...localStateJson.profile.info_cache[key],
-                folder_name: key,
-            });
-        }
-
-        return profiles;
-    }
-
-    // Get a specific profile path
-    getProfilePath(profileName: string): string {
-        const profilePath = path.join(this.profilePath, profileName);
-        if (!fs.existsSync(profilePath)) {
-            throw new Error(`Profile not found: ${profileName}`);
-        }
-        return profileName; // Return just the profile directory name
-    }
-
-    // Launch a range of Chrome profiles
-    async launchProfilesRange(start: number, end: number): Promise<void> {
-        const profiles = this.listProfiles();
-        const profileNames = profiles.slice(start, end + 1).map(profile => profile.folder_name);
-        for (const profileName of profileNames) {
-            await this.launchChrome(profileName);
-        }
-    }
-
-    // Launch profiles based on regex
-    async launchProfilesByRegex(regex: RegExp): Promise<void> {
-        const profiles = this.listProfiles();
-        const profileNames = profiles.filter(profile => regex.test(profile.folder_name)).map(profile => profile.folder_name);
-        for (const profileName of profileNames) {
-            await this.launchChrome(profileName);
-        }
-    }
-
-    // Launch profiles by name
-    async launchProfilesByName(name: string): Promise<void> {
-        const profiles = this.listProfiles();
-        const profileNames = profiles.filter(profile => profile.name === name).map(profile => profile.folder_name);
-        for (const profileName of profileNames) {
-            console.log(profileName);
-            await this.launchChrome(profileName);
-            return;
-        }
-    }
-
-    // Launch profiles by initial letter
-    async launchProfilesByInitialLetter(letter: string): Promise<void> {
-        const profiles = this.listProfiles();
-        const profileNames = profiles.filter(profile => profile.name.startsWith(letter)).map(profile => profile.folder_name);
-        for (const profileName of profileNames) {
-            await this.launchChrome(profileName);
-        }
-    }
-
-    // Launch profile by index
-    async launchProfileByIndex(index: number): Promise<void> {
-        const profiles = this.listProfiles();
-        if (index >= 0 && index < profiles.length) {
-            const profileName = profiles[index].folder_name;
-            await this.launchChrome(profileName);
-        } else {
-            throw new Error(`Profile index out of range: ${index}`);
-        }
+// Inject script into a page
+async function injectScript(page: Page): Promise<void> {
+    try {
+        await scriptInjector.injectScriptFromConsole(page, path.join(process.cwd(), config.scriptsPath));
+    } catch (error) {
+        console.error('Error injecting script:', error);
     }
 }
+
+// Get profile info by name
+function getProfileInfo(profileName: string): ChromeProfileInfo | undefined {
+    const profileData = getProfilesData();
+    return profileData.profiles.find(profile => profile.name === profileName);
+}
+
+// Close a specific Chrome instance
+async function closeChrome(instance: ChromeInstance): Promise<void> {
+    await instance.browser.close();
+    instances = instances.filter(i => i !== instance);
+}
+
+// Close all Chrome instances
+async function closeAll(): Promise<void> {
+    for (const instance of instances) {
+        await instance.browser.close();
+    }
+    instances = [];
+}
+
+// Get all active instances
+function getInstances(): ChromeInstance[] {
+    return instances;
+}
+
+// Create a new profile
+function createProfile(profileName: string): void {
+    const profileDirPath = path.join(profilePath, profileName);
+    if (!fs.existsSync(profileDirPath)) {
+        fs.mkdirSync(profileDirPath);
+    } else {
+        throw new Error(`Profile already exists: ${profileName}`);
+    }
+
+    const profileData = getProfilesData();
+    const profileInfo: ChromeProfileInfo = {
+        folder_name: profileName,
+        active_time: 0,
+        avatar_icon: 'default_icon', // Replace with actual icon if needed
+        background_apps: false,
+        default_avatar_fill_color: 0,
+        default_avatar_stroke_color: 0,
+        force_signin_profile_locked: false,
+        is_consented_primary_account: false,
+        is_ephemeral: false,
+        is_using_default_avatar: true,
+        is_using_default_name: true,
+        metrics_bucket_index: 0,
+        name: profileName,
+        profile_highlight_color: 0,
+        shortcut_name: profileName,
+        signin_with_credential_provider: false,
+        extensions: profileData.defaultExtensions // Add default extensions to new profile
+    };
+
+    fs.writeFileSync(path.join(profileDirPath, 'profile_info.json'), JSON.stringify(profileInfo, null, 2));
+
+    // Update the profiles.json file
+    profileData.profiles.push(profileInfo);
+    updateProfilesFile(profileData);
+
+    // Create a shortcut for the new profile
+    createChromeProfileShortcut(profileName, path.join(process.cwd(), 'shortcuts', `${profileName}.lnk`));
+}
+
+// Remove a profile
+function removeProfile(profileName: string): void {
+    const profileDirPath = path.join(profilePath, profileName);
+    if (fs.existsSync(profileDirPath)) {
+        fs.rmSync(profileDirPath, { recursive: true, force: true });
+    } else {
+        throw new Error(`Profile not found: ${profileName}`);
+    }
+
+    // Update the profiles.json file
+    let profileData = getProfilesData();
+    profileData.profiles = profileData.profiles.filter(profile => profile.folder_name !== profileName);
+    updateProfilesFile(profileData);
+}
+
+// Add a new group
+function addGroup(groupName: string): void {
+    const profileData = getProfilesData();
+    if (profileData.groups.some(group => group.name === groupName)) {
+        throw new Error(`Group already exists: ${groupName}`);
+    }
+
+    const newGroup: GroupInfo = {
+        name: groupName,
+        profiles: [],
+        extensions: []
+    };
+
+    profileData.groups.push(newGroup);
+    updateProfilesFile(profileData);
+
+    // Create a shortcut for the new group
+    createGroupShortcut(groupName, path.join(process.cwd(), 'shortcuts', `${groupName}.lnk`));
+}
+
+// Remove a group
+function removeGroup(groupName: string): void {
+    const profileData = getProfilesData();
+    const groupIndex = profileData.groups.findIndex(group => group.name === groupName);
+    if (groupIndex === -1) {
+        throw new Error(`Group not found: ${groupName}`);
+    }
+
+    profileData.groups.splice(groupIndex, 1);
+    updateProfilesFile(profileData);
+
+    // Remove the shortcut for the group
+    const shortcutPath = path.join(process.cwd(), 'shortcuts', `${groupName}.lnk`);
+    if (fs.existsSync(shortcutPath)) {
+        fs.unlinkSync(shortcutPath);
+    }
+}
+
+// List all profiles
+function listProfiles(): string[] {
+    const profileData = getProfilesData();
+    return profileData.profiles.map(profile => profile.folder_name);
+}
+
+// List all profiles with info
+function listProfilesInfo(): ChromeProfileInfo[] {
+    const profileData = getProfilesData();
+    return profileData.profiles;
+}
+
+// Add a profile to a group
+function addProfileToGroup(groupName: string, profileName: string): void {
+    const profileData = getProfilesData();
+    const group = profileData.groups.find(group => group.name === groupName);
+    if (!group) {
+        throw new Error(`Group not found: ${groupName}`);
+    }
+
+    if (!group.profiles.includes(profileName)) {
+        group.profiles.push(profileName);
+    }
+    updateProfilesFile(profileData);
+}
+
+// Add an extension to a profile
+function addExtensionToProfile(profileName: string, extension: string): void {
+    const profileData = getProfilesData();
+    const profile = profileData.profiles.find(profile => profile.folder_name === profileName);
+    if (!profile) {
+        throw new Error(`Profile not found: ${profileName}`);
+    }
+
+    if (!profile.extensions.includes(extension)) {
+        profile.extensions.push(extension);
+    }
+    updateProfilesFile(profileData);
+}
+
+// Add an extension to a group
+function addExtensionToGroup(groupName: string, extension: string): void {
+    const profileData = getProfilesData();
+    const group = profileData.groups.find(group => group.name === groupName);
+    if (!group) {
+        throw new Error(`Group not found: ${groupName}`);
+    }
+
+    if (!group.extensions.includes(extension)) {
+        group.extensions.push(extension);
+    }
+    updateProfilesFile(profileData);
+}
+
+// Launch profiles by name
+async function launchProfilesByName(name: string): Promise<void> {
+    var extensions = [...new Set([...getProfilesData().defaultExtensions, ...getProfileInfo(name)?.extensions ?? []])];
+    const profiles = listProfilesInfo();
+    const profileNames = profiles.filter(profile => profile.name === name).map(profile => profile.folder_name);
+    if (profileNames.length === 0) {
+        // Profile does not exist, create it
+        createProfile(name);
+        profileNames.push(name);
+    }
+    for (const profileName of profileNames) {
+        await launchChrome(profileName, extensions);
+    }
+}
+
+// Add default extensions
+function addDefaultExtension(extension: string): void {
+    const profileData = getProfilesData();
+    if (!profileData.defaultExtensions.includes(extension)) {
+        profileData.defaultExtensions.push(extension);
+    }
+    updateProfilesFile(profileData);
+}
+
+// Remove default extensions
+function removeDefaultExtension(extension: string): void {
+    const profileData = getProfilesData();
+    profileData.defaultExtensions = profileData.defaultExtensions.filter(ext => ext !== extension);
+    updateProfilesFile(profileData);
+}
+
+// Create a shortcut for a Chrome profile
+function createChromeProfileShortcut(profileName: string, shortcutPath: string): void {
+    const workingDir = process.cwd();
+    const target = path.resolve(workingDir, 'server.exe'); // Caminho para o executável do servidor
+    const args = `open-chrome --name "${profileName}"`;
+
+    // Garantir que o diretório de shortcuts exista
+    fs.mkdirSync(path.dirname(shortcutPath), { recursive: true });
+
+    const command = `powershell -command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('${shortcutPath}'); $s.TargetPath = '${target}'; $s.Arguments = '${args}'; $s.WorkingDirectory = '${workingDir}'; $s.Save()"`;
+
+    exec(command, (error) => {
+        if (error) {
+            console.error(`Error creating shortcut for profile ${profileName}:`, error);
+        } else {
+            console.log(`Shortcut for profile ${profileName} created successfully.`);
+        }
+    });
+}
+
+// Create a shortcut to open a group of profiles
+function createGroupShortcut(groupName: string, shortcutPath: string): void {
+    const workingDir = process.cwd();
+    const target = path.resolve(workingDir, 'server.exe'); // Caminho para o executável do servidor
+    const args = `open-group --name "${groupName}"`;
+
+    const command = `powershell -command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('${shortcutPath}'); $s.TargetPath = '${target}'; $s.Arguments = '${args}'; $s.WorkingDirectory = '${workingDir}'; $s.Save()"`;
+    
+    fs.mkdirSync(path.dirname(shortcutPath), { recursive: true });
+
+    exec(command, (error) => {
+        if (error) {
+            console.error(`Error creating shortcut for group ${groupName}:`, error);
+        } else {
+            console.log(`Shortcut for group ${groupName} created successfully.`);
+        }
+    });
+}
+
+// Get group info by name
+function getGroupInfo(groupName: string): GroupInfo | undefined {
+    const profileData = getProfilesData();
+    return profileData.groups.find(group => group.name === groupName);
+}
+
+const ChromeManager = {
+    initializeChromeManager,
+    launchChrome,
+    launchProfilesByName,
+    closeChrome,
+    closeAll,
+    getInstances,
+    createProfile,
+    removeProfile,
+    addGroup,
+    removeGroup,
+    listProfiles,
+    listProfilesInfo,
+    getProfilesData,
+    getProfileInfo,
+    getGroupInfo,
+    addProfileToGroup,
+    addExtensionToProfile,
+    addExtensionToGroup,
+    addDefaultExtension,
+    removeDefaultExtension
+};
+
+export default ChromeManager;
