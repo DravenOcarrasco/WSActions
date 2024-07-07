@@ -154,22 +154,23 @@ yargs(hideBin(process.argv))
     })
     .command({
         command: 'open-chrome',
-        describe: 'Abre uma instância do Chrome',
+        describe: 'Abre uma perfil do Chrome',
         builder: {
-            name: {
-                describe: 'Nome da instância',
+            profile: {
+                describe: 'Nome do perfil',
                 demandOption: true,
                 type: 'string',
             },
         },
         handler(argv) {
             (async () => {
-                if (typeof argv.name === 'string') {
+                if (typeof argv.profile === 'string') {
                     try {
-                        await sendToServer(IoPort, "open-chrome", { profile: argv.name });
+                        await sendToServer(IoPort, "open-chrome", { profile: argv.profile });
                         process.exit(0);
                     } catch (error) {
-                        await ChromeManager.launchProfilesByName(argv.name);
+                        console.error("Server not initialized");
+                        process.exit(0);
                     }
                 }
             })()
@@ -241,23 +242,12 @@ yargs(hideBin(process.argv))
         command: "server",
         describe: "inicializa em modo servidor",
         async handler(argv) {
+            let io = await startWebSocketServer();
+            io?.listen(IoPort);
             const { default: api } = await import('./api');
             const { scheduleProfiles } = await import('./modules/schedule');
             scheduleProfiles();
             const API = api;
-            try {
-                let io = await startWebSocketServer();
-                if (io) {
-                    io.on('connection', (socket) => {
-                        socket.on('open-chrome', (data) => {
-                            ChromeManager.launchProfilesByName(data.profile);
-                        });
-                    });
-                    io.listen(IoPort);
-                }
-            } catch (error) {
-                console.error('Failed to start WebSocket server:', error);
-            }
         }
     })
     .parse();

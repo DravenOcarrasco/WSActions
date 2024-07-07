@@ -109,22 +109,35 @@ async function launchChrome(profileName: string, extensions: string[]): Promise<
     });
 
     browser.on('targetcreated', async (target) => {
-        const newPage = await target.page();
-        if (newPage) {
-            await setupPage(newPage, profileName);
+        try {
+            const newPage = await target.page();
+            if (newPage) {
+                await setupPage(newPage, profileName);
+            }
+        } catch (error) {
+            console.error('Error setting up new page:', error);
         }
     });
-
+    
     const page = await browser.newPage();
 
-    await page.goto(config.defaultPageUrl);
+    try {
+        await page.goto(config.defaultPageUrl);
+    } catch (error) {
+        console.error('Error navigating to default page:', error);
+    }
+
     let pages = await browser.pages();
     if (pages.length > 1) {
         await pages[0].close();
     }
 
-    await setupPage(page, profileName);
-
+    try {
+        await setupPage(page, profileName);
+    } catch (error) {
+        console.error('Error setting up main page:', error);
+    }
+    
     const instance = { browser, page };
     instances.push(instance);
     return instance;
@@ -132,31 +145,53 @@ async function launchChrome(profileName: string, extensions: string[]): Promise<
 
 // Setup page settings and script injection
 async function setupPage(page: Page, profileName: string): Promise<void> {
-    await page.setBypassCSP(true); // Bypass CSP
-    await page.setViewport({ width: 1300, height: 720 });
-    page.on('framenavigated', async (frame) => {
-        if (frame === page.mainFrame()) {
+    try {
+        await page.setBypassCSP(true); // Bypass CSP
+        await page.setViewport({ width: 1300, height: 720 });
+
+        page.on('framenavigated', async (frame) => {
+            if (frame === page.mainFrame()) {
+                try {
+                    await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileName}'`);
+                    await injectScript(page);
+                } catch (error) {
+                    console.error('Error during frame navigation:', error);
+                }
+            }
+        });
+
+        page.on('framenavigationfailed', async (frame) => {
+            if (frame === page.mainFrame()) {
+                try {
+                    await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileName}'`);
+                    await injectScript(page);
+                } catch (error) {
+                    console.error('Error during frame navigation failed:', error);
+                }
+            }
+        });
+
+        try {
             await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileName}'`);
             await injectScript(page);
+        } catch (error) {
+            console.error('Error during initial script injection:', error);
         }
-    });
 
-    page.on('framenavigationfailed', async (frame) => {
-        if (frame === page.mainFrame()) {
-            await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileName}'`);
-            await injectScript(page);
-        }
-    });
+        // Handle popups
+        page.on('popup', async (popupPage: Page | null) => {
+            if (popupPage) {
+                try {
+                    await setupPage(popupPage, profileName);
+                } catch (error) {
+                    console.error('Error during popup setup:', error);
+                }
+            }
+        });
 
-    await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileName}'`);
-    await injectScript(page);
-
-    // Handle popups
-    page.on('popup', async (popupPage: Page | null) => {
-        if (popupPage) {
-            await setupPage(popupPage, profileName);
-        }
-    });
+    } catch (error) {
+        console.error('Error during page setup:', error);
+    }
 }
 
 // Inject script into a page
