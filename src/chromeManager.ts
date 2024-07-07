@@ -41,6 +41,12 @@ interface ChromeProfileInfo {
     last_downloaded_gaia_picture_url_with_size?: string;
     user_accepted_account_management?: boolean;
     extensions: string[];
+    proxy?: {
+        enabled: boolean,
+        ip: string,
+        user: string,
+        passw: string
+    }
 }
 
 interface GroupInfo {
@@ -72,14 +78,14 @@ function initializeProfilesFile() {
     const profilesFilePath = path.join(profilePath, profilesFileName);
     if (!fs.existsSync(profilesFilePath)) {
         const initialData: ProfilesData = { profiles: [], groups: [], defaultExtensions: [] };
-        fs.writeFileSync(profilesFilePath, JSON.stringify(initialData, null, 2));
+        fs.writeFileSync(profilesFilePath, JSON.stringify(initialData, null, 4));
     }
 }
 
 // Update the profiles.json file
 function updateProfilesFile(profileData: ProfilesData) {
     const profilesFilePath = path.join(profilePath, profilesFileName);
-    fs.writeFileSync(profilesFilePath, JSON.stringify(profileData, null, 2));
+    fs.writeFileSync(profilesFilePath, JSON.stringify(profileData, null, 4));
 }
 
 // Get profiles data
@@ -90,22 +96,28 @@ function getProfilesData(): ProfilesData {
 }
 
 // Launch a new Chrome instance
-async function launchChrome(profileName: string, extensions: string[]): Promise<ChromeInstance> {
+async function launchChrome(profileName: string, extensions: string[], profileInfo:ChromeProfileInfo): Promise<ChromeInstance> {
     const extensionPaths = extensions.join(',');
+    const args = [
+        '--disable-web-security', // Disable web security
+        '--disable-features=IsolateOrigins,site-per-process', // Disable site isolation
+        '--allow-running-insecure-content', // Allow running insecure content
+        '--disable-features=TrustedTypes', // Disable TrustedTypes
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--enable-gpu',
+        `--disable-extensions-except=${extensionPaths}`
+    ];
+
+    if(profileInfo.proxy && profileInfo.proxy.enabled){
+        args.push(`--proxy-server=${profileInfo.proxy.ip}`)
+    }
+
     const browser = await puppeteer.launch({
         headless: false, // Set headless to false to open the browser with a UI
-        args: [
-            '--disable-web-security', // Disable web security
-            '--disable-features=IsolateOrigins,site-per-process', // Disable site isolation
-            '--allow-running-insecure-content', // Allow running insecure content
-            '--disable-features=TrustedTypes', // Disable TrustedTypes
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--enable-gpu',
-            `--disable-extensions-except=${extensionPaths}`
-        ],
         executablePath: config.chromeExecutablePath,
-        userDataDir: path.join(profilePath, profileName)
+        userDataDir: path.join(profilePath, profileName),
+        args
     });
 
     browser.on('targetcreated', async (target) => {
@@ -119,17 +131,26 @@ async function launchChrome(profileName: string, extensions: string[]): Promise<
         }
     });
     
-    const page = await browser.newPage();
-
+    let _pages = await browser.pages();
+    if(_pages.length == 0 ){
+        await browser.newPage();
+    }
+    let page:Page = (await browser.pages())[0];
+    
+    if(profileInfo.proxy && profileInfo.proxy.enabled){
+        await page.authenticate({
+            username: profileInfo.proxy.user,
+            password: profileInfo.proxy.passw,
+        });
+    }
+    
     try {
         await page.goto(config.defaultPageUrl);
+        setTimeout(()=>{
+            page.reload()
+        }, 1000)
     } catch (error) {
         console.error('Error navigating to default page:', error);
-    }
-
-    let pages = await browser.pages();
-    if (pages.length > 1) {
-        await pages[0].close();
     }
 
     try {
@@ -147,7 +168,10 @@ async function launchChrome(profileName: string, extensions: string[]): Promise<
 async function setupPage(page: Page, profileName: string): Promise<void> {
     try {
         await page.setBypassCSP(true); // Bypass CSP
-        await page.setViewport({ width: 1300, height: 720 });
+        await page.setViewport({ 
+            width: config.chromeConfig.viewportWidth, 
+            height: config.chromeConfig.viewportHeight 
+        });
 
         page.on('framenavigated', async (frame) => {
             if (frame === page.mainFrame()) {
@@ -255,10 +279,16 @@ function createProfile(profileName: string): void {
         profile_highlight_color: 0,
         shortcut_name: profileName,
         signin_with_credential_provider: false,
-        extensions: profileData.defaultExtensions // Add default extensions to new profile
+        extensions: profileData.defaultExtensions, // Add default extensions to new profile
+        proxy: {
+            enabled: false,
+            ip: "ip:port",
+            user: "",
+            passw: ""
+        }
     };
 
-    fs.writeFileSync(path.join(profileDirPath, 'profile_info.json'), JSON.stringify(profileInfo, null, 2));
+    fs.writeFileSync(path.join(profileDirPath, 'profile_info.json'), JSON.stringify(profileInfo, null, 4));
 
     // Update the profiles.json file
     profileData.profiles.push(profileInfo);
@@ -386,7 +416,10 @@ async function launchProfilesByName(name: string): Promise<void> {
         profileNames.push(name);
     }
     for (const profileName of profileNames) {
-        await launchChrome(profileName, extensions);
+        const prof = getProfileInfo(profileName)
+        if(prof){
+            await launchChrome(profileName, extensions, prof);
+        }
     }
 }
 

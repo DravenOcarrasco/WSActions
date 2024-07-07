@@ -1,6 +1,0 @@
-{
-    "chromeProfilePath": "./profiles_data",
-    "scriptsPath": "./scripts/injector.js",
-    "defaultPageUrl": "https://www.google.com",
-    "chromeExecutablePath":"C:\\Users\\Marcos\\.cache\\puppeteer\\chrome\\win64-126.0.6478.126\\chrome-win64\\chrome.exe"
-}

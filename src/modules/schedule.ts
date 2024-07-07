@@ -17,6 +17,9 @@ interface ScheduledTask {
 // Função para criar um arquivo de agendamento padrão
 const createDefaultScheduleFile = (filePath: string) => {
     const defaultSchedules: ScheduledTask[] = [
+    ];
+
+    const example: ScheduledTask[] = [
         {
             name: "EveryFiveMinutes",
             profiles: ['BLOCK30'],
@@ -36,7 +39,8 @@ const createDefaultScheduleFile = (filePath: string) => {
             schedule: '0 12 * * *' // Todos os dias às 12:00 PM
         }
     ];
-    fs.writeFileSync(filePath, JSON.stringify(defaultSchedules, null, 2), 'utf-8');
+    fs.writeFileSync(filePath, JSON.stringify(defaultSchedules, null, 4), 'utf-8');
+    fs.writeFileSync(filePath+".example", JSON.stringify(example, null, 4), 'utf-8');
     logger.info(`Default schedules file created at ${filePath}`);
 };
 

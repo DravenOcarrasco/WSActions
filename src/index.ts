@@ -12,12 +12,42 @@ import { hideBin } from 'yargs/helpers';
 
 import indexExample from './examples/index';
 import clientExample from './examples/client';
+import prompts from 'prompts';
 
 const IoPort = 9532;
 let WEBSOCKET_FOUND = false;
 
+// Função para criar um atalho usando PowerShell
+// Função para criar um atalho usando PowerShell
+function createShortcut(executablePath: string, shortcutName: string, args: string) {
+    const shortcutPath = path.join(process.cwd(), `${shortcutName}.lnk`);
+    if (fs.existsSync(shortcutPath)) {
+        // console.log(`Shortcut ${shortcutName} already exists.`);
+        return Promise.resolve(`Shortcut ${shortcutName} already exists.`);
+    }
+    const powershellScript = `
+        $WScriptShell = New-Object -ComObject WScript.Shell;
+        $Shortcut = $WScriptShell.CreateShortcut('${shortcutPath}');
+        $Shortcut.TargetPath = '${executablePath}';
+        $Shortcut.Arguments = '${args}';
+        $Shortcut.Save();
+    `;
+    const encodedCommand = Buffer.from(powershellScript, 'utf16le').toString('base64');
+    return new Promise((resolve, reject) => {
+        exec(`powershell -EncodedCommand ${encodedCommand}`, (error, stdout, stderr) => {
+            if (error) {
+                reject(`Error creating shortcut: ${error}`);
+            } else {
+                resolve(`Shortcut ${shortcutName} created successfully.`);
+            }
+        });
+    });
+}
+createShortcut(path.resolve(process.execPath), 'Run-Server', 'server')
+createShortcut(path.resolve(process.execPath), 'open-chrome', 'open-chrome')
+
 // Função para criar uma extensão
-function createExtension(name: string) {
+async function createExtension(name: string) {
     const extensionDir = path.join(process.cwd(), 'extensions', name);
 
     if (fs.existsSync(extensionDir)) {
@@ -37,7 +67,7 @@ function createExtension(name: string) {
 }
 
 // Função para deletar uma extensão
-function deleteExtension(name: string) {
+async function deleteExtension(name: string) {
     const extensionDir = path.join(process.cwd(), 'extensions', name);
 
     if (!fs.existsSync(extensionDir)) {
@@ -56,13 +86,23 @@ yargs(hideBin(process.argv))
         builder: {
             name: {
                 describe: 'Nome da extensão',
-                demandOption: true,
+                demandOption: false,
                 type: 'string',
             },
         },
-        handler(argv) {
-            if (typeof argv.name === 'string') {
-                createExtension(argv.name);
+        async handler(argv) {
+            let extensionName = argv.name;
+            if (!extensionName) {
+                const response = await prompts({
+                    type: 'text',
+                    name: 'extensionName',
+                    message: 'Digite o nome da extensão:'
+                });
+                extensionName = response.extensionName;
+            }
+
+            if (extensionName) {
+                await createExtension(extensionName);
             }
             process.exit(0); // Sair após a execução do comando
         },
@@ -73,13 +113,23 @@ yargs(hideBin(process.argv))
         builder: {
             name: {
                 describe: 'Nome da extensão',
-                demandOption: true,
+                demandOption: false,
                 type: 'string',
             },
         },
-        handler(argv) {
-            if (typeof argv.name === 'string') {
-                deleteExtension(argv.name);
+        async handler(argv) {
+            let extensionName = argv.name;
+            if (!extensionName) {
+                const response = await prompts({
+                    type: 'text',
+                    name: 'extensionName',
+                    message: 'Digite o nome da extensão:'
+                });
+                extensionName = response.extensionName;
+            }
+
+            if (extensionName) {
+                await deleteExtension(extensionName);
             }
             process.exit(0); // Sair após a execução do comando
         },
@@ -90,13 +140,23 @@ yargs(hideBin(process.argv))
         builder: {
             name: {
                 describe: 'Nome do perfil',
-                demandOption: true,
+                demandOption: false,
                 type: 'string',
             },
         },
-        handler(argv) {
-            if (typeof argv.name === 'string') {
-                ChromeManager.createProfile(argv.name);
+        async handler(argv) {
+            let profileName = argv.name;
+            if (!profileName) {
+                const response = await prompts({
+                    type: 'text',
+                    name: 'profileName',
+                    message: 'Digite o nome do perfil:'
+                });
+                profileName = response.profileName;
+            }
+
+            if (profileName) {
+                ChromeManager.createProfile(profileName);
             }
             process.exit(0); // Sair após a execução do comando
         },
@@ -107,13 +167,23 @@ yargs(hideBin(process.argv))
         builder: {
             name: {
                 describe: 'Nome do perfil',
-                demandOption: true,
+                demandOption: false,
                 type: 'string',
             },
         },
-        handler(argv) {
-            if (typeof argv.name === 'string') {
-                ChromeManager.removeProfile(argv.name);
+        async handler(argv) {
+            let profileName = argv.name;
+            if (!profileName) {
+                const response = await prompts({
+                    type: 'text',
+                    name: 'profileName',
+                    message: 'Digite o nome do perfil:'
+                });
+                profileName = response.profileName;
+            }
+
+            if (profileName) {
+                ChromeManager.removeProfile(profileName);
             }
             process.exit(0); // Sair após a execução do comando
         },
@@ -124,13 +194,23 @@ yargs(hideBin(process.argv))
         builder: {
             name: {
                 describe: 'Nome do grupo',
-                demandOption: true,
+                demandOption: false,
                 type: 'string',
             },
         },
-        handler(argv) {
-            if (typeof argv.name === 'string') {
-                ChromeManager.addGroup(argv.name);
+        async handler(argv) {
+            let groupName = argv.name;
+            if (!groupName) {
+                const response = await prompts({
+                    type: 'text',
+                    name: 'groupName',
+                    message: 'Digite o nome do grupo:'
+                });
+                groupName = response.groupName;
+            }
+
+            if (groupName) {
+                ChromeManager.addGroup(groupName);
             }
             process.exit(0); // Sair após a execução do comando
         },
@@ -141,13 +221,23 @@ yargs(hideBin(process.argv))
         builder: {
             name: {
                 describe: 'Nome do grupo',
-                demandOption: true,
+                demandOption: false,
                 type: 'string',
             },
         },
-        handler(argv) {
-            if (typeof argv.name === 'string') {
-                ChromeManager.removeGroup(argv.name);
+        async handler(argv) {
+            let groupName = argv.name;
+            if (!groupName) {
+                const response = await prompts({
+                    type: 'text',
+                    name: 'groupName',
+                    message: 'Digite o nome do grupo:'
+                });
+                groupName = response.groupName;
+            }
+
+            if (groupName) {
+                ChromeManager.removeGroup(groupName);
             }
             process.exit(0); // Sair após a execução do comando
         },
@@ -158,22 +248,29 @@ yargs(hideBin(process.argv))
         builder: {
             profile: {
                 describe: 'Nome do perfil',
-                demandOption: true,
+                demandOption: false,
                 type: 'string',
             },
         },
-        handler(argv) {
-            (async () => {
-                if (typeof argv.profile === 'string') {
-                    try {
-                        await sendToServer(IoPort, "open-chrome", { profile: argv.profile });
-                        process.exit(0);
-                    } catch (error) {
-                        console.error("Server not initialized");
-                        process.exit(0);
-                    }
+        async handler(argv) {
+            let profileName = argv.profile;
+            if (!profileName) {
+                const response = await prompts({
+                    type: 'text',
+                    name: 'profileName',
+                    message: 'Digite o nome do perfil:'
+                });
+                profileName = response.profileName;
+            }
+
+            if (profileName) {
+                try {
+                    await sendToServer(IoPort, "open-chrome", { profile: profileName });
+                } catch (error) {
+                    console.error("Server not initialized");
                 }
-            })()
+            }
+            process.exit(0);
         },
     })
     .command({
@@ -182,26 +279,37 @@ yargs(hideBin(process.argv))
         builder: {
             name: {
                 describe: 'Nome do grupo',
-                demandOption: true,
+                demandOption: false,
                 type: 'string',
             },
         },
-        handler(argv) {
-            (async () => {
-                if (typeof argv.name === 'string') {
-                    const profilesData = ChromeManager.getProfilesData();
-                    var extensions = [...new Set([...profilesData.defaultExtensions, ...ChromeManager.getGroupInfo(argv.name)?.extensions ?? []])];
-                    const group = profilesData.groups.find(g => g.name === argv.name);
-                    if (group) {
-                        for (const profileName of group.profiles) {
-                            await ChromeManager.launchChrome(profileName, extensions);
+        async handler(argv) {
+            let groupName = argv.name;
+            if (!groupName) {
+                const response = await prompts({
+                    type: 'text',
+                    name: 'groupName',
+                    message: 'Digite o nome do grupo:'
+                });
+                groupName = response.groupName;
+            }
+
+            if (groupName) {
+                const profilesData = ChromeManager.getProfilesData();
+                var extensions = [...new Set([...profilesData.defaultExtensions, ...ChromeManager.getGroupInfo(groupName)?.extensions ?? []])];
+                const group = profilesData.groups.find(g => g.name === groupName);
+                if (group) {
+                    for (const profileName of group.profiles) {
+                        const prof = ChromeManager.getProfileInfo(profileName)
+                        if (prof) {
+                            await ChromeManager.launchChrome(profileName, extensions, prof);
                         }
-                    } else {
-                        console.error(`Group not found: ${argv.name}`);
                     }
+                } else {
+                    console.error(`Group not found: ${groupName}`);
                 }
-                process.exit(0);
-            })()
+            }
+            process.exit(0);
         },
     })
     .command({
@@ -210,13 +318,23 @@ yargs(hideBin(process.argv))
         builder: {
             name: {
                 describe: 'Nome da extensão',
-                demandOption: true,
+                demandOption: false,
                 type: 'string',
             },
         },
-        handler(argv) {
-            if (typeof argv.name === 'string') {
-                ChromeManager.addDefaultExtension(argv.name);
+        async handler(argv) {
+            let extensionName = argv.name;
+            if (!extensionName) {
+                const response = await prompts({
+                    type: 'text',
+                    name: 'extensionName',
+                    message: 'Digite o nome da extensão:'
+                });
+                extensionName = response.extensionName;
+            }
+
+            if (extensionName) {
+                ChromeManager.addDefaultExtension(extensionName);
             }
             process.exit(0); // Sair após a execução do comando
         },
@@ -227,13 +345,23 @@ yargs(hideBin(process.argv))
         builder: {
             name: {
                 describe: 'Nome da extensão',
-                demandOption: true,
+                demandOption: false,
                 type: 'string',
             },
         },
-        handler(argv) {
-            if (typeof argv.name === 'string') {
-                ChromeManager.removeDefaultExtension(argv.name);
+        async handler(argv) {
+            let extensionName = argv.name;
+            if (!extensionName) {
+                const response = await prompts({
+                    type: 'text',
+                    name: 'extensionName',
+                    message: 'Digite o nome da extensão:'
+                });
+                extensionName = response.extensionName;
+            }
+
+            if (extensionName) {
+                ChromeManager.removeDefaultExtension(extensionName);
             }
             process.exit(0); // Sair após a execução do comando
         },

@@ -8,6 +8,10 @@ interface Config {
     scriptsPath: string;
     defaultPageUrl: string;
     chromeExecutablePath: string;
+    chromeConfig: {
+        viewportWidth: number;
+        viewportHeight: number;
+    }
 }
 
 // Obtém o diretório do usuário atual
@@ -15,10 +19,14 @@ const userHomeDir = os.homedir();
 
 // Configuração padrão
 const defaultConfig: Config = {
-    chromeProfilePath: path.join(userHomeDir, 'AppData', 'Local', 'Google', 'Chrome', 'User Data'),
+    chromeProfilePath: "./profiles_data",
     scriptsPath: "./scripts/injector.js",
     defaultPageUrl: "https://www.google.com",
-    chromeExecutablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+    chromeExecutablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    chromeConfig: {
+        viewportWidth: 1360,
+        viewportHeight: 768
+    }
 };
 
 // Função para carregar a configuração do arquivo config.json
@@ -27,7 +35,7 @@ export const loadConfig = (): Config => {
 
     if (!fs.existsSync(configPath)) {
         // Se o arquivo não existir, cria com a configuração padrão
-        fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
+        fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 4));
         console.log(`Config file created at ${configPath} with default settings.`);
     }
 
