@@ -8,12 +8,12 @@
             const timeout = setTimeout(() => {
                 resolve({ success: false, error: 'Timeout: A operação demorou mais de 10 segundos.' });
             }, 10000);
-    
+
             socket.on(`storage.store.res.${MODULE_NAME}.${window.identifier}.${key}`, (data) => {
                 clearTimeout(timeout);
                 resolve(data);
             });
-    
+
             socket.emit('storage.store', {
                 extension: MODULE_NAME,
                 id: window.identifier,
@@ -23,13 +23,13 @@
             });
         });
     };
-    
+
     const getStorage = async (key) => {
         return new Promise((resolve) => {
             const timeout = setTimeout(() => {
                 resolve({ success: false, error: 'Timeout: A operação demorou mais de 10 segundos.' });
             }, 10000);
-    
+
             socket.on(`storage.load.res.${MODULE_NAME}.${window.identifier}.${key}`, (data) => {
                 clearTimeout(timeout);
                 if (data.success) {
@@ -38,7 +38,7 @@
                     resolve({ success: false, error: 'Erro ao carregar o armazenamento' });
                 }
             });
-    
+
             socket.emit('storage.load', {
                 extension: MODULE_NAME,
                 id: window.identifier,
@@ -47,10 +47,9 @@
             });
         });
     };
-    
+
     const getVariable = async (variableName, defaultValue, create = false) => {
         const data = await getStorage(variableName);
-        console.log(data)
         if (!data.success && create) {
             await setStorage(variableName, defaultValue);
             return defaultValue;
@@ -127,7 +126,7 @@
     function toggleMasterText(isMaster) {
         const masterTextId = 'master-text';
         let masterText = document.getElementById(masterTextId);
-    
+
         if (isMaster) {
             if (!masterText) {
                 masterText = document.createElement('div');
@@ -314,4 +313,17 @@
     document.addEventListener('click', captureAction, true);
     document.addEventListener('input', captureAction, true);
     document.addEventListener('change', captureAction, true);
+
+    // Registro da extensão no contexto global
+    if (window.extensionContext) {
+        window.extensionContext.addExtension(MODULE_NAME, {
+            location: window.location
+            // Adicione aqui qualquer funcionalidade ou dados que deseja expor ao contexto
+        });
+
+        // Registro da extensão no painel de controle
+        if (window.extensionContext.isExtensionLoaded(MODULE_NAME)) {
+            window.extensionContext.emit('extensionLoaded', MODULE_NAME);
+        }
+    }
 })();

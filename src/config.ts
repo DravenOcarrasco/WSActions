@@ -20,7 +20,7 @@ const userHomeDir = os.homedir();
 // Configuração padrão
 const defaultConfig: Config = {
     chromeProfilePath: "./profiles_data",
-    scriptsPath: "./scripts/injector.js",
+    scriptsPath: "./automate",
     defaultPageUrl: "https://www.google.com",
     chromeExecutablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     chromeConfig: {

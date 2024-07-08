@@ -72,6 +72,18 @@ export default function mount(name:string){
     socket.on('disconnect', () => {
         console.log('Disconnected from WebSocket server');
     });
+
+    if (window.extensionContext) {
+        window.extensionContext.addExtension(MODULE_NAME, {
+            location: window.location
+            // Adicione aqui qualquer funcionalidade ou dados que deseja expor ao contexto
+        });
+
+        // Registro da extensão no painel de controle
+        if (window.extensionContext.isExtensionLoaded(MODULE_NAME)) {
+            window.extensionContext.emit('extensionLoaded', MODULE_NAME);
+        }
+    }
 })();
     `;
 }

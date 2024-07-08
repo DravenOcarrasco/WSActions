@@ -221,7 +221,7 @@ async function setupPage(page: Page, profileName: string): Promise<void> {
 // Inject script into a page
 async function injectScript(page: Page): Promise<void> {
     try {
-        await scriptInjector.injectScriptFromConsole(page, path.join(process.cwd(), config.scriptsPath));
+        await scriptInjector.injectScriptFromConsole(page, path.join(process.cwd(), "scripts", "injector.js"));
     } catch (error) {
         console.error('Error injecting script:', error);
     }
@@ -406,7 +406,8 @@ function addExtensionToGroup(groupName: string, extension: string): void {
 }
 
 // Launch profiles by name
-async function launchProfilesByName(name: string): Promise<void> {
+async function launchProfilesByName(name: string): Promise<ChromeInstance[]> {
+    const instances:ChromeInstance[] = []
     var extensions = [...new Set([...getProfilesData().defaultExtensions, ...getProfileInfo(name)?.extensions ?? []])];
     const profiles = listProfilesInfo();
     const profileNames = profiles.filter(profile => profile.name === name).map(profile => profile.folder_name);
@@ -418,9 +419,10 @@ async function launchProfilesByName(name: string): Promise<void> {
     for (const profileName of profileNames) {
         const prof = getProfileInfo(profileName)
         if(prof){
-            await launchChrome(profileName, extensions, prof);
+            instances.push(await launchChrome(profileName, extensions, prof));
         }
     }
+    return instances
 }
 
 // Add default extensions

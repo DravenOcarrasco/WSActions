@@ -2,6 +2,45 @@
     'use strict';
     let floatingWindow;
 
+    if (window.extensionContext) {
+        console.log('Injetor já carregado.');
+        return;
+    }
+
+    // Inicializa o contexto global para armazenar extensões e eventos
+    window.extensionContext = {
+        extensions: {},
+        events: {},
+        initialized: true,
+        addExtension: function (name, context) {
+            if(this.extensions[name] == undefined){
+                this.extensions[name] = context;
+                this.extensions[name].events = {};
+                this.emit('extensionLoaded', name); // Emite evento quando uma extensão é carregada
+            }
+        },
+        getExtension: function (name) {
+            return this.extensions[name] || null;
+        },
+        isExtensionLoaded: function (name) {
+            return this.extensions.hasOwnProperty(name);
+        },
+        on: function (event, listener) {
+            if (!this.events[event]) {
+                this.events[event] = [];
+            }
+            this.events[event].push(listener);
+        },
+        off: function (event, listener) {
+            if (!this.events[event]) return;
+            this.events[event] = this.events[event].filter(l => l !== listener);
+        },
+        emit: function (event, data) {
+            if (!this.events[event]) return;
+            this.events[event].forEach(listener => listener(data));
+        }
+    };
+
     // Função para adicionar um script ao documento
     function addScript(src) {
         return new Promise((resolve, reject) => {
@@ -28,7 +67,7 @@
     async function loadExtension(extension){
         const scriptUrl = `http://127.0.0.1:9514/ext/${extension.NAME}/client`;
         await addScript(scriptUrl);
-        addExtensionToList(extension.NAME);
+        //window.extensionContext.addExtension(extension.NAME, { loaded: true });
     }
 
     // Carrega as bibliotecas necessárias
@@ -68,35 +107,37 @@
         }
     }
 
-    // Função para adicionar a extensão à lista de extensões carregadas
-    async function addExtensionToList(extensionName) {
+    // Função para registrar uma extensão no painel
+    function registerExtension(name) {
         const list = document.getElementById('extensions-list');
         const listItem = document.createElement('li');
         listItem.style.display = 'flex';
         listItem.style.alignItems = 'center';
         listItem.style.marginBottom = '10px';
+        listItem.style.fontWeight = 'bold'; // Texto mais grosso
+        listItem.style.color = '#333'; // Cor do texto
 
-        const iconUrl = `http://127.0.0.1:9514/ext/${extensionName}/icon`;
-        try {
-            const response = await fetch(iconUrl);
-            const base64Icon = await response.text();
+        const iconUrl = `http://127.0.0.1:9514/ext/${name}/icon`;
+        fetch(iconUrl)
+            .then(response => response.text())
+            .then(base64Icon => {
+                const icon = document.createElement('img');
+                icon.src = base64Icon;
+                icon.alt = name;
+                icon.style.width = '24px';
+                icon.style.height = '24px';
+                icon.style.marginRight = '10px';
 
-            const icon = document.createElement('img');
-            icon.src = base64Icon;
-            icon.alt = extensionName;
-            icon.style.width = '24px';
-            icon.style.height = '24px';
-            icon.style.marginRight = '10px';
+                const text = document.createElement('span');
+                text.textContent = name;
 
-            const text = document.createElement('span');
-            text.textContent = extensionName;
-
-            listItem.appendChild(icon);
-            listItem.appendChild(text);
-            list.appendChild(listItem);
-        } catch (error) {
-            console.error(`Erro ao carregar o ícone da extensão ${extensionName}:`, error);
-        }
+                listItem.appendChild(icon);
+                listItem.appendChild(text);
+                list.appendChild(listItem);
+            })
+            .catch(error => {
+                console.error(`Erro ao carregar o ícone da extensão ${name}:`, error);
+            });
     }
 
     // Função para criar a janela flutuante
@@ -110,6 +151,8 @@
         floatingWindow.style.height = '400px';
         floatingWindow.style.backgroundColor = 'white';
         floatingWindow.style.border = '1px solid black';
+        floatingWindow.style.borderRadius = '10px'; // Bordas arredondadas
+        floatingWindow.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)'; // Sombra
         floatingWindow.style.overflowY = 'scroll';
         floatingWindow.style.zIndex = '10000';
         floatingWindow.style.display = 'none'; // Inicialmente escondido
@@ -119,6 +162,8 @@
         header.style.backgroundColor = '#f1f1f1';
         header.style.borderBottom = '1px solid black';
         header.textContent = 'Extensões Carregadas';
+        header.style.fontWeight = 'bold'; // Texto mais grosso
+        header.style.color = '#333'; // Cor do texto
 
         const list = document.createElement('ul');
         list.id = 'extensions-list';
@@ -145,6 +190,11 @@
         if (event.ctrlKey && event.altKey && event.key === 'p') {
             toggleFloatingWindow();
         }
+    });
+
+    // Listener para registrar a extensão quando ela for carregada
+    window.extensionContext.on('extensionLoaded', function (name) {
+        registerExtension(name);
     });
 
     // Executa o carregamento das bibliotecas e extensões

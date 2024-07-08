@@ -85,8 +85,11 @@
             });
 
             if (recordingTitle) {
-                console.log('Recording title:', recordingTitle);
-                // Save the recording title to storage or perform any other necessary action
+                socket.emit(`${MODULE_NAME}.make:script`, {
+                    name: recordingTitle,
+                    history: await getVariable("record_temp", {})
+                });
+                await setStorage("record_temp", {});
             } else {
                 console.log('Recording title input was cancelled');
             }
@@ -131,4 +134,89 @@
     });
 
     await applyRecordingIconIfRecording();  // Check and apply recording icon on load
+    
+    // Função para obter o XPath de um elemento
+    function getElementXPath(element) {
+        const paths = [];
+        for (; element && element.nodeType === Node.ELEMENT_NODE; element = element.parentNode) {
+            let index = 0;
+            for (let sibling = element.previousSibling; sibling; sibling = sibling.previousSibling) {
+                if (sibling.nodeType === Node.DOCUMENT_TYPE_NODE) continue;
+                if (sibling.nodeName === element.nodeName) ++index;
+            }
+            const tagName = element.nodeName.toLowerCase();
+            const pathIndex = index ? `[${index + 1}]` : '';
+            paths.unshift(`${tagName}${pathIndex}`);
+        }
+        return paths.length ? `/${paths.join('/')}` : null;
+    }
+
+    async function captureAction(event) {
+        if (await getVariable('isRecording', false)) {
+            const element = event.target;
+            const tagName = element.tagName;
+            const action = event.type;
+            const value = element.value;
+            const selector = getElementXPath(element);
+            let data = {
+                tagName, 
+                action, 
+                value: value || null, 
+                selector,
+                location: window.location.href,
+                timestamp: new Date().toISOString(),
+                additionalInfo: {}
+            };
+
+            // Adiciona informações adicionais dependendo do tipo de evento
+            if (action === 'scroll') {
+                data.additionalInfo = {
+                    scrollX: window.scrollX,
+                    scrollY: window.scrollY
+                };
+            } else if (action === 'keydown' || action === 'keyup' || action === 'keypress') {
+                data.additionalInfo = {
+                    key: event.key,
+                    code: event.code,
+                    keyCode: event.keyCode
+                };
+            } else if (action === 'click' || action === 'dblclick' || action === 'mousedown' || action === 'mouseup') {
+                data.additionalInfo = {
+                    button: event.button,
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                    screenX: event.screenX,
+                    screenY: event.screenY
+                };
+            }
+
+            console.log(data);
+            let last = await getVariable("record_temp", {});
+            last[data.timestamp] = data;
+            await setStorage("record_temp", last);
+        }
+    }
+
+    // Lista de eventos a serem capturados
+    const eventsToCapture = [
+        'click', 'dblclick', 'mousedown', 'mouseup', 'mouseover', 'mouseout', 
+        'keydown', 'keyup', 'keypress', 'input', 'change', 'scroll'
+    ];
+
+    // Captura todos os eventos listados
+    eventsToCapture.forEach(eventType => {
+        document.addEventListener(eventType, captureAction, true);
+    });
+
+    // Registro da extensão no contexto global
+    if (window.extensionContext) {
+        window.extensionContext.addExtension(MODULE_NAME, {
+            location: window.location
+        });
+
+        // Registro da extensão no painel de controle
+        if (window.extensionContext.isExtensionLoaded(MODULE_NAME)) {
+            window.extensionContext.emit('extensionLoaded', MODULE_NAME);
+        }
+    }
 })();
