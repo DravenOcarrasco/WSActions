@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+
 /**
  * Módulo da extensão.
  * 
@@ -197,7 +198,7 @@ ${delayScript}    const ${elementName} = await page.waitForSelector('${selector}
     };
 
     const transformSelector = (selector) => {
-        return isXPath(selector) ? `::-p-xpath(${selector})` : selector;
+        return isXPath(selector) ? `xpath/${selector}` : selector;
     };
 
     const isXPath = (selector) => {
