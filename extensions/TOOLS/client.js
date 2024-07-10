@@ -214,7 +214,7 @@
                 if (!data) return;
                 const { command, data: payload } = data;
                 if (command === 'browser:openPage') {
-                    window.location.href = payload;
+                    window.location.href = data.payload;
                 } else if (command === 'browser:reloadPage') {
                     window.location.reload();
                 } else if (command === 'global:control') {

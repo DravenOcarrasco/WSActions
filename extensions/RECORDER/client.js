@@ -240,7 +240,7 @@
 
         // Registro da extensão no painel de controle
         if (window.extensionContext.isExtensionLoaded(context.MODULE_NAME)) {
-            window.extensionContext.emit('extensionLoaded', MODULE_NAME);
+            window.extensionContext.emit('extensionLoaded', context.MODULE_NAME);
         }
     }
 })();
