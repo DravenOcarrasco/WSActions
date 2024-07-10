@@ -1,13 +1,11 @@
 (function () {
     'use strict';
     let floatingWindow;
-
+    
     if (window.extensionContext) {
-        console.log('Injetor já carregado.');
-        return;
+        return
     }
 
-    // Inicializa o contexto global para armazenar extensões e eventos
     window.extensionContext = {
         extensions: {},
         events: {},
@@ -39,7 +37,6 @@
             this.events[event].forEach(listener => listener(data));
         }
     };
-
     // Função para adicionar um script ao documento
     function addScript(src) {
         return new Promise((resolve, reject) => {
@@ -62,16 +59,16 @@
     }
 
     async function loadExtension(extension){
-        const scriptUrl = `http://127.0.0.1:9514/ext/${extension.NAME}/client`;
+        const scriptUrl = `http://127.0.0.1:${window.injectorPort}/ext/${extension.NAME}/client`;
         await addScript(scriptUrl);
     }
 
     // Carrega as bibliotecas necessárias
     async function loadLibraries() {
         const libraries = [
-            'http://127.0.0.1:9514/js/jquery-3.6.0.min.js',
-            'http://127.0.0.1:9514/js/sweetalert2.js',
-            'http://127.0.0.1:9514/js/socket.io.js'
+            `http://127.0.0.1:${window.injectorPort}/js/jquery-3.6.0.min.js`,
+            `http://127.0.0.1:${window.injectorPort}/js/sweetalert2.js`,
+            `http://127.0.0.1:${window.injectorPort}/js/socket.io.js`,
         ];
 
         try {
@@ -85,7 +82,7 @@
     // Função para carregar as extensões habilitadas
     async function loadEnabledExtensions() {
         try {
-            const response = await fetch('http://127.0.0.1:9514/extensions');
+            const response = await fetch(`http://127.0.0.1:${window.injectorPort}/extensions`);
             const data = await response.json();
             const enabledExtensions = data.ENABLED || [];
 
@@ -98,7 +95,7 @@
             await Promise.all(enabledExtensions.map(extension => loadExtension(extension)));
         } catch (error) {
             setTimeout(() => {
-                window.open('http://127.0.0.1:9514/extensions', '_blank');
+                window.open(`http://127.0.0.1:${window.injectorPort}/extensions`, '_blank');
             }, 1000);
         }
     }
@@ -113,7 +110,7 @@
         listItem.style.fontWeight = 'bold'; // Texto mais grosso
         listItem.style.color = '#333'; // Cor do texto
 
-        const iconUrl = `http://127.0.0.1:9514/ext/${name}/icon`;
+        const iconUrl = `http://127.0.0.1:${window.injectorPort}/ext/${name}/icon`;
         fetch(iconUrl)
             .then(response => response.text())
             .then(base64Icon => {
@@ -199,4 +196,7 @@
         await loadLibraries();
         await loadEnabledExtensions();
     });
+
+    createFloatingWindow();
+    loadLibraries().then(loadEnabledExtensions);
 })();

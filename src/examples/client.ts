@@ -12,7 +12,7 @@ export default function mount(name: string) {
      */
     async function MakeContext() {
         const MODULE_NAME = "${name.toUpperCase()}";
-        const socket = io('http://127.0.0.1:9514/', { secure: true });
+        const socket = io(\`http://127.0.0.1:\${window.injectorPort}/\`, { secure: false });
         const VAR_NAMES = ["variable1", "variable2", "variable3"];
 
         /**

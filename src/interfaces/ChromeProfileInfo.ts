@@ -25,4 +25,11 @@ export interface ChromeProfileInfo {
     gaia_picture_file_name?: string;
     last_downloaded_gaia_picture_url_with_size?: string;
     user_accepted_account_management?: boolean;
+    extensions: string[];
+    proxy?: {
+        enabled: boolean,
+        ip: string,
+        user: string,
+        passw: string
+    }
 }

@@ -4,6 +4,7 @@ import fs from 'fs';
 import { ScriptInjector } from './scriptInjector';
 import { loadConfig } from './config'; // Importa a função de configuração
 import { exec } from 'child_process';
+import { ChromeProfileInfo } from './interfaces/ChromeProfileInfo';
 
 const scriptInjector = new ScriptInjector();
 const config = loadConfig(); // Carrega a configuração
@@ -12,43 +13,6 @@ interface ChromeInstance {
     browser: Browser;
     page: Page;
 }
-
-interface ChromeProfileInfo {
-    folder_name: string;
-    active_time: number;
-    avatar_icon: string;
-    background_apps: boolean;
-    default_avatar_fill_color: number;
-    default_avatar_stroke_color: number;
-    force_signin_profile_locked: boolean;
-    gaia_given_name?: string;
-    gaia_id?: string;
-    gaia_name?: string;
-    hosted_domain?: string;
-    is_consented_primary_account: boolean;
-    is_ephemeral: boolean;
-    is_using_default_avatar: boolean;
-    is_using_default_name: boolean;
-    managed_user_id?: string;
-    metrics_bucket_index: number;
-    name: string;
-    profile_highlight_color: number;
-    shortcut_name: string;
-    signin_with_credential_provider: boolean;
-    user_name?: string;
-    first_account_name_hash?: number;
-    gaia_picture_file_name?: string;
-    last_downloaded_gaia_picture_url_with_size?: string;
-    user_accepted_account_management?: boolean;
-    extensions: string[];
-    proxy?: {
-        enabled: boolean,
-        ip: string,
-        user: string,
-        passw: string
-    }
-}
-
 interface GroupInfo {
     name: string;
     profiles: string[];
@@ -173,34 +137,32 @@ async function setupPage(page: Page, profileName: string): Promise<void> {
             height: config.chromeConfig.viewportHeight 
         });
 
+        // Function to inject the script
+        const injectScripts = async () => {
+            try {
+                await scriptInjector.injectScriptFromString(page, `if(window.injectorPort == undefined) window.injectorPort = '${config.http.port}'`);
+                await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileName}'`);
+                await injectScript(page);
+            } catch (error) {
+                console.error('Error during script injection:', error);
+            }
+        };
+        
+        // Initial script injection
+        page.once('load', injectScripts);
+
+        // Event listeners for frame navigation
         page.on('framenavigated', async (frame) => {
             if (frame === page.mainFrame()) {
-                try {
-                    await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileName}'`);
-                    await injectScript(page);
-                } catch (error) {
-                    console.error('Error during frame navigation:', error);
-                }
+                await injectScripts();
             }
         });
 
         page.on('framenavigationfailed', async (frame) => {
             if (frame === page.mainFrame()) {
-                try {
-                    await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileName}'`);
-                    await injectScript(page);
-                } catch (error) {
-                    console.error('Error during frame navigation failed:', error);
-                }
+                await injectScripts();
             }
         });
-
-        try {
-            await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileName}'`);
-            await injectScript(page);
-        } catch (error) {
-            console.error('Error during initial script injection:', error);
-        }
 
         // Handle popups
         page.on('popup', async (popupPage: Page | null) => {
@@ -445,7 +407,7 @@ function removeDefaultExtension(extension: string): void {
 function createChromeProfileShortcut(profileName: string, shortcutPath: string): void {
     const workingDir = process.cwd();
     const target = path.resolve(workingDir, 'server.exe'); // Caminho para o executável do servidor
-    const args = `open-chrome --name "${profileName}"`;
+    const args = `open-chrome --profile "${profileName}"`;
 
     // Garantir que o diretório de shortcuts exista
     fs.mkdirSync(path.dirname(shortcutPath), { recursive: true });

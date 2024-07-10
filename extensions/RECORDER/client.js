@@ -1,7 +1,7 @@
 (async function () {
     async function MakeContext(){
         const MODULE_NAME = "RECORDER";
-        const socket = io('http://127.0.0.1:9514/', { secure: false });
+        const socket = io(`http://127.0.0.1:${window.injectorPort}/`, { secure: false });
         const VAR_NAMES = ["record_temp", "isRecording"]
 
         /**

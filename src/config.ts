@@ -11,6 +11,9 @@ interface Config {
     chromeConfig: {
         viewportWidth: number;
         viewportHeight: number;
+    },
+    http: {
+        port: number
     }
 }
 
@@ -26,6 +29,9 @@ const defaultConfig: Config = {
     chromeConfig: {
         viewportWidth: 1360,
         viewportHeight: 768
+    },
+    http: {
+        port: 9514
     }
 };
 

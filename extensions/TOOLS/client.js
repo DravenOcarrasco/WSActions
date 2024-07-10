@@ -2,7 +2,7 @@
     async function MakeContext() {
         const MODULE_NAME = "TOOLS";
         const DEFAULT_MAX_DELAY = 1000; // Valor padrão de maxDelay em milissegundos
-        const socket = io('http://127.0.0.1:9514/', { secure: false }); // Conexão segura via HTTPS
+        const socket = io(`http://127.0.0.1:${window.injectorPort}/`, { secure: false });
         const VAR_NAMES = ["isMaster", "maxDelay", "record_temp"];
 
         const setStorage = async (key, value) => {

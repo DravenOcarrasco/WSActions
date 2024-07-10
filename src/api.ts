@@ -5,15 +5,15 @@ import { Server as SocketIoServer, Socket } from 'socket.io';
 import readline from 'readline';
 import cors from 'cors';
 import ModuleController from '../extensions';  // Verifique se o caminho para este módulo está correto
+import { loadConfig } from './config';
+
+const config = loadConfig();
 
 // Definir o diretório de execução
 const execPath = process.execPath;
 const execDir = execPath.includes("bun.exe") || execPath.includes("node.exe")
     ? path.dirname(__dirname)
     : path.dirname(execPath);
-
-const PORT_WS_HTTP = 9514;
-
 console.log(`EXT_PATH: ${path.resolve(execDir, 'extensions')}`);
 
 // Inicializando o Express
@@ -44,8 +44,8 @@ io.on('connection', (socket) => {
 });
 
 // Iniciando os servidores WebSocket
-httpServerWS.listen(PORT_WS_HTTP, () => {
-    console.log(`HTTP Server is running on http://127.0.0.1:${PORT_WS_HTTP}`);
+httpServerWS.listen(config.http.port, () => {
+    console.log(`HTTP Server in http://127.0.0.1:${config.http.port}`);
 });
 
 // Interface de linha de comando (CLI) para enviar comandos
