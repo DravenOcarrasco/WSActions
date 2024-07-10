@@ -15,7 +15,6 @@
         addExtension: function (name, context) {
             if(this.extensions[name] == undefined){
                 this.extensions[name] = context;
-                this.extensions[name].events = {};
                 this.emit('extensionLoaded', name); // Emite evento quando uma extensão é carregada
             }
         },
@@ -47,11 +46,9 @@
             const script = document.createElement('script');
             script.src = src;
             script.onload = () => {
-                console.info(`EXT_DONE: ${src}`);
                 resolve();
             };
             script.onerror = () => {
-                console.error(`Erro ao carregar ${src}`);
                 Swal.fire({
                     icon: 'error',
                     title: 'Erro ao carregar extensão',
@@ -67,7 +64,6 @@
     async function loadExtension(extension){
         const scriptUrl = `http://127.0.0.1:9514/ext/${extension.NAME}/client`;
         await addScript(scriptUrl);
-        //window.extensionContext.addExtension(extension.NAME, { loaded: true });
     }
 
     // Carrega as bibliotecas necessárias

@@ -55,4 +55,57 @@ const rl = readline.createInterface({
 });
 
 ModuleController.init(io, app, rl);
+
+var ExtenssionsMenu: any = {}
+
+function showMenu() {
+    let menuText = `
+Escolha uma opção:
+1. Listar clientes conectados
+2. Sair
+`;
+
+    ExtenssionsMenu = {}
+    // Adicionar comandos das extensões ao menu
+    let optionNumber = 3;
+    for (const [extension, commands] of Object.entries(ModuleController.COMMANDS.CLI)) {
+        for (const [event, command] of Object.entries(commands)) {
+            menuText += `${optionNumber}. ${extension}.${event}: ${command.description}\n`;
+            ExtenssionsMenu[optionNumber] = command._function
+            optionNumber++;
+        }
+    }
+    console.log(menuText);
+}
+
+function listConnectedClients() {
+    console.log('Clientes conectados:');
+    connectedClients.forEach(client => {
+        console.log(`- ID: ${client.id}`);
+    });
+    showMenu();
+}
+
+rl.on('line', (input) => {
+    const option = input.trim();
+    switch (option) {
+        case '1':
+            listConnectedClients();
+            break;
+        case '2':
+            rl.close();
+            break;
+        default:
+            if (ExtenssionsMenu[option] == undefined) {
+                console.log('Opção inválida. Tente novamente.');
+                showMenu();
+            } else {
+                ExtenssionsMenu[option]()
+                break;
+            }
+    }
+});
+
+showMenu();
+
 export default httpServerWS

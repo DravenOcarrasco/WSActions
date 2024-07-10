@@ -15,9 +15,6 @@ import clientExample from './examples/client';
 import prompts from 'prompts';
 
 const IoPort = 9532;
-let WEBSOCKET_FOUND = false;
-
-// Função para criar um atalho usando PowerShell
 // Função para criar um atalho usando PowerShell
 function createShortcut(executablePath: string, shortcutName: string, args: string) {
     const shortcutPath = path.join(process.cwd(), `${shortcutName}.lnk`);

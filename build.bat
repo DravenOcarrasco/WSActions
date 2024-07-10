@@ -26,9 +26,14 @@ rem Copy the 'scripts' directory to 'build'
 xcopy /E /I scripts build\scripts
 
 rem Delete the 'build/index.ts' file if it exists
-if exist build\index.ts (
-    del /f build\index.ts
+set build_dir=%cd%\build
+if exist "%build_dir%\extensions\index.ts" (
+    del /f /q "%build_dir%\extensions\index.ts"
+)
+
+rem Delete the 'src-build' directory if it exists (final step)
+if exist src-build (
+    rd /s /q src-build
 )
 
 echo Build process completed.
-pause

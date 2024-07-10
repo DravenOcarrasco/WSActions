@@ -50,6 +50,8 @@ module.exports = (WSIO, APP, RL, STORAGE, EXPRESS) => {
         }
     };
 
+    const COMMANDS = {};
+
     const processHistory = (history) => {
         elementCounter = 0;
         const processedHistory = [];
@@ -203,17 +205,6 @@ ${delayScript}    const ${elementName} = await page.waitForSelector('${selector}
 
     const isXPath = (selector) => {
         return selector && (selector.startsWith('/') || selector.startsWith('('));
-    };
-
-    const COMMANDS = {
-        "exampleCommand": {
-            description: "Descrição do comando de exemplo",
-            _function: (data) => {
-                RL.question('Digite um valor de exemplo: ', (input) => {
-                    WSIO.emit(`${NAME}:command`, { command: 'example', payload: input });
-                });
-            }
-        }
     };
 
     const onInitialize = () => {

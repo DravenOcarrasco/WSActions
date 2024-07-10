@@ -1,12 +1,3 @@
 [
-    {
-        "name": "EveryFiveMinutes",
-        "profiles": [
-            "BLOCK30"
-        ],
-        "scripts": [
-            "coingecko.js"
-        ],
-        "schedule": "*/1 * * * *"
-    }
+
 ]
