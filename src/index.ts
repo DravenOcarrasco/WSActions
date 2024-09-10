@@ -7,7 +7,7 @@ import fs from 'fs';
 import { exec } from 'child_process';
 import { startWebSocketServer, sendToServer, io } from './cli-websocket';
 
-import yargs, { command } from 'yargs';
+import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
 import indexExample from './examples/index';

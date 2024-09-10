@@ -70,7 +70,7 @@
             `http://127.0.0.1:${window.injectorPort}/js/sweetalert2.js`,
             `http://127.0.0.1:${window.injectorPort}/js/socket.io.js`,
         ];
-
+        console.log(libraries)
         try {
             await Promise.all(libraries.map(addScript));
             console.info('Todas as bibliotecas foram carregadas com sucesso.');
@@ -85,19 +85,13 @@
             const response = await fetch(`http://127.0.0.1:${window.injectorPort}/extensions`);
             const data = await response.json();
             const enabledExtensions = data.ENABLED || [];
-
             if (enabledExtensions.length === 0) {
                 console.log('Nenhuma extensão habilitada encontrada.');
                 return;
             }
-
             // Carrega os scripts das extensões habilitadas
             await Promise.all(enabledExtensions.map(extension => loadExtension(extension)));
-        } catch (error) {
-            setTimeout(() => {
-                window.open(`http://127.0.0.1:${window.injectorPort}/extensions`, '_blank');
-            }, 1000);
-        }
+        } catch (error) {}
     }
 
     // Função para registrar uma extensão no painel

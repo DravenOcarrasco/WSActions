@@ -1,7 +1,7 @@
 (async function () {
     async function MakeContext(){
         const MODULE_NAME = "RECORDER";
-        const socket = io(`http://127.0.0.1:${window.injectorPort}/`, { secure: false });
+        const socket = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/`, { secure: false });
         const VAR_NAMES = ["record_temp", "isRecording"]
 
         /**
@@ -19,17 +19,17 @@
                     resolve({ success: false, error: 'Timeout: A operação demorou mais de 10 segundos.' });
                 }, 10000);
 
-                socket.on(`storage.store.res.${MODULE_NAME}.${window.identifier}.${key}`, (data) => {
+                socket.on(`storage.store.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`, (data) => {
                     clearTimeout(timeout);
                     resolve(data);
                 });
 
                 socket.emit('storage.store', {
                     extension: MODULE_NAME,
-                    id: window.identifier,
+                    id: window.WSACTION.config.identifier,
                     key,
                     value,
-                    response: `storage.store.res.${MODULE_NAME}.${window.identifier}.${key}`
+                    response: `storage.store.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`
                 });
             });
         };
@@ -40,7 +40,7 @@
                     resolve({ success: false, error: 'Timeout: A operação demorou mais de 10 segundos.' });
                 }, 10000);
 
-                socket.on(`storage.load.res.${MODULE_NAME}.${window.identifier}.${key}`, (data) => {
+                socket.on(`storage.load.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`, (data) => {
                     clearTimeout(timeout);
                     if (data.success) {
                         resolve(data);
@@ -51,9 +51,9 @@
 
                 socket.emit('storage.load', {
                     extension: MODULE_NAME,
-                    id: window.identifier,
+                    id: window.WSACTION.config.identifier,
                     key,
-                    response: `storage.load.res.${MODULE_NAME}.${window.identifier}.${key}`
+                    response: `storage.load.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`
                 });
             });
         };

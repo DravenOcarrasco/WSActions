@@ -1,10 +1,27 @@
 {
-  "name": "pswaction",
+  "name": "wsaction",
   "version": "1.0.0",
-  "main": "main.js",
+  "main": "dist/src/index.js",
+  "bin": "dist/src/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "ts-node src/index.ts"
+    "build": "tsc",
+    "nexe-build": "nexe -t windows-x64-14.15.3 .\\src\\index.ts",
+    "start": "node dist/src/index.js",
+    "dev": "bun src/index.ts server",
+    "postinstall": "node dist/src/setup.js"
+  },
+  "pkg": {
+    "scripts": [
+      "dist/src/setup.js"
+    ],
+    "assets": [
+      "node_modules/puppeteer/.local-chromium/**/*"
+    ],
+    "targets": [
+      "node16-linux-x64",
+      "node16-macos-x64",
+      "node16-win-x64"
+    ]
   },
   "keywords": [],
   "author": "",
@@ -23,15 +40,20 @@
     "typescript": "^5.5.2"
   },
   "dependencies": {
+    "@cloudflare/puppeteer": "^0.0.11",
     "@swc/cli": "^0.4.0",
     "@swc/core": "^1.6.6",
     "@types/yargs": "^17.0.32",
+    "cloudflare-puppeteer-extra": "^1.0.1",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "node-schedule": "^2.1.1",
     "prompts": "^2.4.2",
-    "puppeteer": "^22.12.1",
+    "puppeteer": "^22.13.1",
     "puppeteer-core": "^22.12.1",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-recaptcha": "^3.6.8",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "socket.io": "^4.7.5",
     "socket.io-client": "^4.7.5",
     "windows-shortcuts": "^0.1.6",

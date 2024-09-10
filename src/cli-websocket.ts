@@ -15,15 +15,12 @@ export async function startWebSocketServer(): Promise<SocketIOServer | null> {
                 },
             });
             io.on('connection', (socket) => {
-
                 socket.on('open-chrome', (data) => {
-                    console.log(data)
                     ChromeManager.launchProfilesByName(data.profile);
                 });
             });
             resolve(io);
         } catch (error: any) {
-            // console.error(`Failed to start WebSocket server: ${error.message}`);
             io = null;
             reject(error);
         }

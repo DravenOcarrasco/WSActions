@@ -1,4 +1,5 @@
-import puppeteer, { Browser, Page } from 'puppeteer';
+import puppeteer from 'puppeteer-extra';
+import { Browser, Page } from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 import { ScriptInjector } from './scriptInjector';
@@ -6,8 +7,17 @@ import { loadConfig } from './config'; // Importa a função de configuração
 import { exec } from 'child_process';
 import { ChromeProfileInfo } from './interfaces/ChromeProfileInfo';
 
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import RecaptchaPlugin from 'puppeteer-extra-plugin-recaptcha';
+
 const scriptInjector = new ScriptInjector();
 const config = loadConfig(); // Carrega a configuração
+
+
+const puppeteerStealth = StealthPlugin();
+puppeteerStealth.enabledEvasions.delete('user-agent-override');
+puppeteer.use(puppeteerStealth)
+// puppeteer.use(RecaptchaPlugin())
 
 interface ChromeInstance {
     browser: Browser;
@@ -76,9 +86,9 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
     if(profileInfo.proxy && profileInfo.proxy.enabled){
         args.push(`--proxy-server=${profileInfo.proxy.ip}`)
     }
-
+    
     const browser = await puppeteer.launch({
-        headless: false, // Set headless to false to open the browser with a UI
+        headless: profileInfo.headless, // Set headless to false to open the browser with a UI
         executablePath: config.chromeExecutablePath,
         userDataDir: path.join(profilePath, profileName),
         args
@@ -132,6 +142,7 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
 async function setupPage(page: Page, profileName: string): Promise<void> {
     try {
         await page.setBypassCSP(true); // Bypass CSP
+        // await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36')
         await page.setViewport({ 
             width: config.chromeConfig.viewportWidth, 
             height: config.chromeConfig.viewportHeight 
@@ -226,28 +237,16 @@ function createProfile(profileName: string): void {
     const profileData = getProfilesData();
     const profileInfo: ChromeProfileInfo = {
         folder_name: profileName,
-        active_time: 0,
-        avatar_icon: 'default_icon', // Replace with actual icon if needed
-        background_apps: false,
-        default_avatar_fill_color: 0,
-        default_avatar_stroke_color: 0,
-        force_signin_profile_locked: false,
-        is_consented_primary_account: false,
-        is_ephemeral: false,
-        is_using_default_avatar: true,
-        is_using_default_name: true,
-        metrics_bucket_index: 0,
         name: profileName,
-        profile_highlight_color: 0,
         shortcut_name: profileName,
-        signin_with_credential_provider: false,
         extensions: profileData.defaultExtensions, // Add default extensions to new profile
         proxy: {
             enabled: false,
             ip: "ip:port",
             user: "",
             passw: ""
-        }
+        },
+        headless: false
     };
 
     fs.writeFileSync(path.join(profileDirPath, 'profile_info.json'), JSON.stringify(profileInfo, null, 4));

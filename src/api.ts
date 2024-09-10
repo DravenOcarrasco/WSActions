@@ -6,6 +6,10 @@ import readline from 'readline';
 import cors from 'cors';
 import ModuleController from '../extensions';  // Verifique se o caminho para este módulo está correto
 import { loadConfig } from './config';
+import { cwd } from 'process';
+import { readFile } from 'fs/promises';
+
+import ABOUT from './about'
 
 const config = loadConfig();
 
@@ -22,6 +26,25 @@ app.use(cors());
 
 // Servir arquivos estáticos
 app.use(express.static(path.join(execDir, "public")));
+
+// Middleware personalizado para /client.js
+app.get('/client.js', async (req, res) => {
+    const filePath = path.join(cwd(), 'scripts', 'injector.js');
+    const additionalScripts = `
+        if(window.injectorPort == undefined) window.injectorPort = '${config.http.port}';
+    `;
+
+    try {
+        const data = await readFile(filePath, 'utf8');
+        const modifiedContent = additionalScripts + data;
+        
+        res.setHeader('Content-Type', 'application/javascript');
+        res.send(modifiedContent);
+    } catch (err) {
+        console.log(err)
+        res.status(500).send('Internal Server Error');
+    }
+});
 
 // Inicializando servidores HTTP para WebSocket
 const httpServerWS = http.createServer(app);
@@ -60,7 +83,11 @@ var ExtenssionsMenu: any = {}
 
 function showMenu() {
     let menuText = `
-Escolha uma opção:
+===================================
+        ​🇼​​🇸 ​​🇦​​🇨​​🇹​​🇮​​🇴​​🇳​ ${ABOUT.VERSION}
+===================================
+Escolha uma das opções:
+-----------------------------------
 1. Listar clientes conectados
 2. Sair
 `;
@@ -76,6 +103,7 @@ Escolha uma opção:
         }
     }
     console.log(menuText);
+
 }
 
 function listConnectedClients() {
