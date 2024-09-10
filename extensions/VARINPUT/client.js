@@ -8,7 +8,8 @@
         const socket = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/`, { secure: false });
         let VAR_NAMES = [];
         let VAR_VALUES = {};
-
+        let VARIABLES = [] // Carregar lista de variáveis armazenadas
+        
         /**
          * Stores a value in the module's storage.
          * @param {string} key - The storage key.
@@ -111,6 +112,15 @@
         };
 
         /**
+         * Removes a variable from the list.
+         * @param {string} variableName - The name of the variable to remove.
+         */
+        const removeVariable = async (variableName) => {
+            VARIABLES = VARIABLES.filter(v => v.name !== variableName);
+            await setStorage('VARIABLES', VARIABLES); // Atualiza o armazenamento após a remoção
+        };
+
+        /**
          * Function to get the list of variables from storage.
          * @returns {Promise<Array>} - The list of variable objects { name, value }.
          */
@@ -119,36 +129,103 @@
             return storedVariables.success ? storedVariables.value.filter(v => v.name && v.value) : [];
         };
 
-        let VARIABLES = await getVariableList(); // Carregar lista de variáveis armazenadas
+        VARIABLES = await getVariableList();
 
-        socket.on('connect', () => {
-            console.log(`${MODULE_NAME} Connected to WebSocket server`);
+        /**
+         * Function to show, edit and remove variables
+         */
+        const showVariableList = () => {
+            const variableList = VARIABLES
+                .map(({ name, value }, index) => `
+                    <div style="margin-bottom: 10px;">
+                        <strong>${name}:</strong> ${value}
+                        <button onclick="editVariable(${index})" style="margin-left: 10px;">Editar</button>
+                        <button onclick="removeVariable(${index})" style="margin-left: 5px;">Remover</button>
+                    </div>
+                `).join('');
 
-            socket.on(`${MODULE_NAME}:variables`, (data) => {
-                VAR_NAMES = Object.keys(data);
-                VAR_VALUES = data;
-                console.log('Received variable list:', VAR_NAMES);
-                console.log('Received variable values:', VAR_VALUES);
-                initializeInputValues();
+            Swal.fire({
+                title: 'Lista de Variáveis',
+                html: variableList || '<p>Nenhuma variável cadastrada</p>',
+                width: 600,
+                padding: '3em',
+                showConfirmButton: false,
+                background: '#fff',
+                backdrop: `
+                    rgba(0,0,123,0.4)
+                    url("https://sweetalert2.github.io/images/nyan-cat.gif")
+                    left top
+                    no-repeat
+                `
+            });
+        };
+
+        /**
+         * Function to edit a variable
+         */
+        window.editVariable = async (index) => {
+            const variable = VARIABLES[index];
+            const { value: formValues } = await Swal.fire({
+                title: 'Editar Variável',
+                html: `
+                    <input id="swal-input1" class="swal2-input" value="${variable.name}" placeholder="Nome da Variável">
+                    <input id="swal-input2" class="swal2-input" value="${variable.value}" placeholder="Valor da Variável">
+                `,
+                focusConfirm: false,
+                preConfirm: () => {
+                    return [
+                        document.getElementById('swal-input1').value,
+                        document.getElementById('swal-input2').value
+                    ];
+                }
             });
 
-            socket.on(`${MODULE_NAME}:event`, (data) => {
-                console.log('Received event:', data);
-            });
-        });
+            if (formValues) {
+                const [varName, varValue] = formValues;
+                if (varName && varValue) {
+                    await addOrUpdateVariable(varName, varValue);
+                    Swal.fire(`Variável ${varName} atualizada!`);
+                    VARIABLES[index] = { name: varName, value: varValue }; // Atualiza localmente
+                    showVariableList(); // Atualiza a lista
+                } else {
+                    Swal.fire('Preencha ambos os campos');
+                }
+            }
+        };
 
-        socket.on('disconnect', () => {
-            console.log(`${MODULE_NAME} Disconnected from WebSocket server`);
-        });
+        /**
+         * Function to remove a variable
+         */
+        window.removeVariable = async (index) => {
+            const variable = VARIABLES[index];
+            await removeVariable(variable.name); // Remove da lista e atualiza o armazenamento
+            Swal.fire(`Variável ${variable.name} removida!`);
+            showVariableList(); // Atualiza a lista após remoção
+        };
+
+        /**
+         * Function to get a variable from the VARIABLES array.
+         * If the variable doesn't exist, it returns the default value.
+         * @param {string} variableName - The name of the variable to find.
+         * @param {any} defaultValue - The default value if the variable is not found.
+         * @returns {any} - The value of the variable or the default value.
+         */
+        const getVariableFromList = (variableName, defaultValue) => {
+            const variable = VARIABLES.find(v => v.name === variableName);
+            return variable ? variable.value : defaultValue;
+        };
 
         return {
             MODULE_NAME,
             VAR_NAMES,
             VAR_VALUES,
+            getVariableFromList,
             setStorage,
             getStorage,
             getVariable,
             addOrUpdateVariable, // Função para adicionar ou atualizar variáveis
+            removeVariable, // Função para remover variáveis
+            showVariableList, // Função para listar as variáveis
             socket
         };
     }
@@ -158,78 +235,40 @@
     // Set to keep track of inputs that have the event listener
     const inputsWithListener = new Set();
 
-    // Function to handle input changes
-    const handleInputChange = async (event) => {
-        const input = event.target;
-        const value = input.value;
-
-        // Check for variable format {{variable_name}}
-        const variablePattern = /{{(.*?)}}/g;
-        const match = variablePattern.exec(value);
-        if (match) {
-            const variableName = match[1];
-            const variableValue = await context.getVariable(variableName, "");
-            input.value = value.replace(`{{${variableName}}}`, variableValue);
-        }
-
-        console.log(`Input changed: ${input.name} = ${input.value}`);
-        await context.addOrUpdateVariable(input.name, input.value); // Adiciona ou atualiza a variável
-    };
-
     // Function to observe changes in the DOM
     const observeDOMChanges = () => {
+        console.log('Observing DOM changes...');
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
-                if (mutation.type === 'childList' || mutation.type === 'subtree') {
-                    const inputs = document.querySelectorAll('input');
-                    inputs.forEach((input) => {
-                        if (!inputsWithListener.has(input)) {
-                            input.addEventListener('input', handleInputChange);
-                            inputsWithListener.add(input);
-                            replaceVariableInInput(input);
-                        }
-                    });
-                }
+                // Seleciona tanto inputs quanto textareas
+                const inputsAndTextareas = document.querySelectorAll('input, textarea');
+                inputsAndTextareas.forEach((input) => {
+                    // Verifica se já foi adicionado pelo nosso código, usando a flag "data-my-listener"
+                    if (!input.hasAttribute('data-my-listener')) {
+                        input.addEventListener('input', async (event) => {
+                            const value = event.target.value;
+                            const variablePattern = /{{(.*?)}}/g;
+                            let match;
+                            let newValue = value;
+    
+                            while ((match = variablePattern.exec(value)) !== null) {
+                                const variableName = match[1];
+                                // Use the new function to get variable value from VARIABLES or use a default value
+                                const variableValue = context.getVariableFromList(variableName, `{{${variableName}}}`);
+                                newValue = newValue.replace(`{{${variableName}}}`, variableValue);
+                            }
+                            input.value = newValue;
+                        });
+    
+                        // Adiciona o atributo para marcar que o listener foi adicionado
+                        input.setAttribute('data-my-listener', 'true');
+                        inputsWithListener.add(input); // Adiciona ao Set de inputs
+                    }
+                });
             });
         });
-
+    
         observer.observe(document.body, { childList: true, subtree: true });
-    };
-
-    // Initial setup of input listeners
-    const initializeInputListeners = () => {
-        const inputs = document.querySelectorAll('input');
-        inputs.forEach((input) => {
-            if (!inputsWithListener.has(input)) {
-                input.addEventListener('input', handleInputChange);
-                inputsWithListener.add(input);
-                replaceVariableInInput(input);
-            }
-        });
-    };
-
-    // Function to replace variables in inputs
-    const replaceVariableInInput = async (input) => {
-        const value = input.value;
-        const variablePattern = /{{(.*?)}}/g;
-        let match;
-        let newValue = value;
-
-        while ((match = variablePattern.exec(value)) !== null) {
-            const variableName = match[1];
-            const variableValue = await context.getVariable(variableName, "");
-            newValue = newValue.replace(`{{${variableName}}}`, variableValue);
-        }
-
-        input.value = newValue;
-    };
-
-    // Function to initialize input values with variables
-    const initializeInputValues = () => {
-        const inputs = document.querySelectorAll('input');
-        inputs.forEach((input) => {
-            replaceVariableInInput(input);
-        });
     };
 
     // Function to show the Swal menu for variable management
@@ -259,42 +298,20 @@
         }
     };
 
-    // Function to show the list of variables
-    const showVariableList = () => {
-        const variableList = VARIABLES
-            .map(({ name, value }) => `<p><strong>${name}:</strong> ${value}</p>`)
-            .join('');
-
-        Swal.fire({
-            title: 'Lista de Variáveis',
-            html: variableList || '<p>Nenhuma variável cadastrada</p>',
-            width: 600,
-            padding: '3em',
-            background: '#fff',
-            backdrop: `
-                rgba(0,0,123,0.4)
-                url("https://sweetalert2.github.io/images/nyan-cat.gif")
-                left top
-                no-repeat
-            `
-        });
-    };
-
     // Function to handle key combinations
     const handleKeyCombination = (event) => {
+        //console.log(`Teclas pressionadas: ctrl=${event.ctrlKey}, alt=${event.altKey}, key=${event.key}`);
         if (event.ctrlKey && event.altKey) {
             if (event.key === 'v') {
                 showVariableMenu();
             } else if (event.key === 'l') {
-                showVariableList();
+                context.showVariableList();
             }
         }
     };
 
-    // Initialize the input listeners and start observing DOM changes
-    initializeInputListeners();
     observeDOMChanges();
-
+    
     // Add the keydown event listener
     document.addEventListener('keydown', handleKeyCombination);
 
@@ -310,4 +327,5 @@
             window.extensionContext.emit('extensionLoaded', context.MODULE_NAME);
         }
     }
+    
 })();
