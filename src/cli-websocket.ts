@@ -15,7 +15,7 @@ export async function startWebSocketServer(): Promise<SocketIOServer | null> {
                 },
             });
             io.on('connection', (socket) => {
-                socket.on('open-chrome', (data) => {
+                SOCKET.on('open-chrome', (data) => {
                     ChromeManager.launchProfilesByName(data.profile);
                 });
             });
@@ -48,7 +48,7 @@ export async function sendToServer(port: number, event: string, data: any): Prom
             reject(new Error('Connection timed out'));
         }, 5000);
 
-        clientSocket.on('connect', () => {
+        clientSOCKET.on('connect', () => {
             clearTimeout(timeout);
             clientSocket.emit(event, data);
             setTimeout(()=>{
@@ -57,7 +57,7 @@ export async function sendToServer(port: number, event: string, data: any): Prom
             },100)
         });
 
-        clientSocket.on('error', (error) => {
+        clientSOCKET.on('error', (error) => {
             clearTimeout(timeout);
             reject(error);
         });

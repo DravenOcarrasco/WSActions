@@ -1,8 +1,7 @@
 (async function () {
     async function MakeContext(){
         const MODULE_NAME = "RECORDER";
-        const socket = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/`, { secure: false });
-        const VAR_NAMES = ["record_temp", "isRecording"]
+        const SOCKET = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/`, { secure: false });
         const KEYBOARD_COMMANDS = [
             {
                 description: "INIT/STOP RECORD",
@@ -39,12 +38,12 @@
                     resolve({ success: false, error: 'Timeout: A operação demorou mais de 10 segundos.' });
                 }, 10000);
 
-                socket.on(`storage.store.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`, (data) => {
+                SOCKET.on(`storage.store.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`, (data) => {
                     clearTimeout(timeout);
                     resolve(data);
                 });
 
-                socket.emit('storage.store', {
+                SOCKET.emit('storage.store', {
                     extension: MODULE_NAME,
                     id: window.WSACTION.config.identifier,
                     key,
@@ -60,7 +59,7 @@
                     resolve({ success: false, error: 'Timeout: A operação demorou mais de 10 segundos.' });
                 }, 10000);
 
-                socket.on(`storage.load.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`, (data) => {
+                SOCKET.on(`storage.load.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`, (data) => {
                     clearTimeout(timeout);
                     if (data.success) {
                         resolve(data);
@@ -69,7 +68,7 @@
                     }
                 });
 
-                socket.emit('storage.load', {
+                SOCKET.emit('storage.load', {
                     extension: MODULE_NAME,
                     id: window.WSACTION.config.identifier,
                     key,
@@ -145,15 +144,15 @@
             }
         };
 
-        socket.on('connect', () => {
+        SOCKET.on('connect', () => {
             console.log('Connected to WebSocket server');
 
-            socket.on(`${MODULE_NAME}:event`, (data) => {
+            SOCKET.on(`${MODULE_NAME}:event`, (data) => {
                 console.log('Received event:', data);
             });
         });
 
-        socket.on('disconnect', () => {
+        SOCKET.on('disconnect', () => {
             console.log('Disconnected from WebSocket server');
         });
 
@@ -241,13 +240,12 @@
 
         return {
             MODULE_NAME,
-            VAR_NAMES,
             KEYBOARD_COMMANDS,
             showMenu,
             setStorage,
             getStorage,
             getVariable,
-            socket,
+            SOCKET,
         }
     }
 
@@ -258,10 +256,5 @@
             location: window.location,
             ...context
         });
-
-        // // Registro da extensão no painel de controle
-        // if (window.extensionContext.isExtensionLoaded(context)) {
-        //     window.extensionContext.emit('extensionLoaded', context);
-        // }
     }
 })();

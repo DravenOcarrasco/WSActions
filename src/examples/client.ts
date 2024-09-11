@@ -12,8 +12,7 @@ export default function mount(name: string) {
      */
     async function MakeContext() {
         const MODULE_NAME = "${name.toUpperCase()}";
-        const socket = io(\`http://127.0.0.1:\${window.injectorPort}/\`, { secure: false });
-        const VAR_NAMES = ["variable1", "variable2", "variable3"];
+        const SOCKET = io(\`\${window.WSACTION.config.ip}:\${window.WSACTION.config.port}\`, { secure: false });
 
         const KEYBOARD_COMMANDS = [
             {
@@ -44,7 +43,7 @@ export default function mount(name: string) {
                     resolve(data);
                 });
 
-                socket.emit('storage.store', {
+                SOCKET.emit('storage.store', {
                     extension: MODULE_NAME,
                     id: window.identifier,
                     key,
@@ -74,7 +73,7 @@ export default function mount(name: string) {
                     }
                 });
 
-                socket.emit('storage.load', {
+                SOCKET.emit('storage.load', {
                     extension: MODULE_NAME,
                     id: window.identifier,
                     key,
@@ -111,7 +110,7 @@ export default function mount(name: string) {
             console.log('Menu is shown with options:', options);
         };
 
-        socket.on('connect', () => {
+        SOCKET.on('connect', () => {
             console.log(\`\${MODULE_NAME} Connected to WebSocket server\`);
 
             socket.on(\`\${MODULE_NAME}:event\`, (data) => {
@@ -119,19 +118,18 @@ export default function mount(name: string) {
             });
         });
 
-        socket.on('disconnect', () => {
+        SOCKET.on('disconnect', () => {
             console.log(\`\${MODULE_NAME} Disconnected from WebSocket server\`);
         });
 
         return {
             MODULE_NAME,
             KEYBOARD_COMMANDS,
-            VAR_NAMES,
             setStorage,
             getStorage,
             getVariable,
             showMenu,
-            socket
+            SOCKET
         };
     }
 
@@ -145,9 +143,9 @@ export default function mount(name: string) {
         });
 
         // Register the extension in the control panel
-        if (window.extensionContext.isExtensionLoaded(context)) {
-            window.extensionContext.emit('extensionLoaded', context.MODULE_NAME);
-        }
+        // if (window.extensionContext.isExtensionLoaded(context)) {
+        //     window.extensionContext.emit('extensionLoaded', context.MODULE_NAME);
+        // }    
     }
 })();
     `;

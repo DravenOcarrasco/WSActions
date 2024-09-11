@@ -61,7 +61,7 @@ const connectedClients = new Set<Socket>(); // Usando Set para armazenar cliente
 io.on('connection', (socket) => {
     connectedClients.add(socket);
     ModuleController.initIoToSocket(socket);
-    socket.on('disconnect', () => {
+    SOCKET.on('disconnect', () => {
         connectedClients.delete(socket);
     });
 });

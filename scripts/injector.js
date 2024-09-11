@@ -67,7 +67,24 @@
         await addScript(scriptUrl);
     }
 
+    // Função para aguardar até que a config esteja pronta
+    async function waitForConfig() {
+        return new Promise((resolve, reject) => {
+            const checkConfig = () => {
+                if (window.WSACTION && window.WSACTION.config && window.WSACTION.config.ip && window.WSACTION.config.port) {
+                    resolve();  // Configuração está pronta
+                } else {
+                    setTimeout(checkConfig, 100);  // Verifica novamente após 100ms
+                }
+            };
+            checkConfig();  // Inicia a verificação
+        });
+    }
+
     async function loadLibraries() {
+        
+        await waitForConfig()
+
         const libraries = [
             `http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/js/jquery-3.6.0.min.js`,
             `http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/js/sweetalert2.js`,

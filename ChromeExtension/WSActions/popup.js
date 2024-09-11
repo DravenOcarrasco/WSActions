@@ -69,21 +69,19 @@ function getServerIP(callback) {
 function checkConnection(ip, port) {
     const url = `http://${ip}:${port}/client.js`;
     fetch(url)
-        .then(response => {
-            if (response.ok) {
-                document.getElementById('status').innerText = 'Conectado';
-                document.getElementById('status').classList.remove('text-danger');
-                document.getElementById('status').classList.add('text-success');
-                console.log('client.js carregado com sucesso');
-            } else {
-                throw new Error('Erro ao carregar client.js');
-            }
-        })
-        .catch(error => {
-            document.getElementById('status').innerText = 'Desconectado';
-            document.getElementById('status').classList.remove('text-success');
-            document.getElementById('status').classList.add('text-danger');
-        });
+    .then(response => {
+        if (response.ok) {
+            document.getElementById('status').innerText = 'Conectado';
+            document.getElementById('status').classList.remove('text-danger');
+            document.getElementById('status').classList.add('text-success');
+            console.log('client.js carregado com sucesso');
+        }
+    })
+    .catch(() => {
+        document.getElementById('status').innerText = 'Desconectado';
+        document.getElementById('status').classList.remove('text-success');
+        document.getElementById('status').classList.add('text-danger');
+    });
 }
 
 function showReloadButton() {

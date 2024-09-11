@@ -5,7 +5,7 @@
      */
     async function MakeContext() {
         const MODULE_NAME = "VARINPUT";
-        const socket = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/`, { secure: false });
+        const SOCKET = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/`, { secure: false });
         const KEYBOARD_COMMANDS = [
             {
                 description: "Register a new Variable",
@@ -43,7 +43,6 @@
             }
         ]
         
-        let VAR_NAMES = [];
         let VAR_VALUES = {};
         let VARIABLES = [] // Carregar lista de variáveis armazenadas
         
@@ -61,12 +60,12 @@
                     resolve({ success: false, error: 'Timeout: The operation took more than 10 seconds.' });
                 }, 10000);
 
-                socket.on(`storage.store.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`, (data) => {
+                SOCKET.on(`storage.store.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`, (data) => {
                     clearTimeout(timeout);
                     resolve(data);
                 });
 
-                socket.emit('storage.store', {
+                SOCKET.emit('storage.store', {
                     extension: MODULE_NAME,
                     id: window.WSACTION.config.identifier,
                     key,
@@ -87,7 +86,7 @@
                     resolve({ success: false, error: 'Timeout: The operation took more than 10 seconds.' });
                 }, 10000);
 
-                socket.on(`storage.load.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`, (data) => {
+                SOCKET.on(`storage.load.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`, (data) => {
                     clearTimeout(timeout);
                     if (data.success) {
                         resolve(data);
@@ -96,7 +95,7 @@
                     }
                 });
 
-                socket.emit('storage.load', {
+                SOCKET.emit('storage.load', {
                     extension: MODULE_NAME,
                     id: window.WSACTION.config.identifier,
                     key,
@@ -256,7 +255,6 @@
 
         return {
             MODULE_NAME,
-            VAR_NAMES,
             VAR_VALUES,
             KEYBOARD_COMMANDS,
             getVariableFromList,
@@ -266,7 +264,7 @@
             addOrUpdateVariable, // Função para adicionar ou atualizar variáveis
             removeVariable, // Função para remover variáveis
             showVariableList, // Função para listar as variáveis
-            socket
+            SOCKET
         };
     }
 
@@ -364,11 +362,6 @@
             location: window.location,
             ...context
         });
-
-        // Register the extension in the control panel
-        // if (window.extensionContext.isExtensionLoaded(context)) {
-        //     window.extensionContext.emit('extensionLoaded', context);
-        // }
     }
     
 })();

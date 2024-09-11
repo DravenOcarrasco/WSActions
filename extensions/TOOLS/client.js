@@ -1,9 +1,10 @@
 (async function () {
+    const MAX_RAMDOM_TIME = 7000
+
     async function MakeContext() {
         const MODULE_NAME = "TOOLS";
         const DEFAULT_MAX_DELAY = 1000; // Valor padrão de maxDelay em milissegundos
-        const socket = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/`, { secure: false });
-        const VAR_NAMES = ["isMaster", "maxDelay", "record_temp"];
+        const SOCKET = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/`, { secure: false });
         const KEYBOARD_COMMANDS = [
             {
                 description: "Toggle Master session",
@@ -27,12 +28,12 @@
                     resolve({ success: false, error: 'Timeout: A operação demorou mais de 10 segundos.' });
                 }, 10000);
 
-                socket.on(`storage.store.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`, (data) => {
+                SOCKET.on(`storage.store.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`, (data) => {
                     clearTimeout(timeout);
                     resolve(data);
                 });
 
-                socket.emit('storage.store', {
+                SOCKET.emit('storage.store', {
                     extension: MODULE_NAME,
                     id: window.WSACTION.config.identifier,
                     key,
@@ -48,7 +49,7 @@
                     resolve({ success: false, error: 'Timeout: A operação demorou mais de 10 segundos.' });
                 }, 10000);
 
-                socket.on(`storage.load.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`, (data) => {
+                SOCKET.on(`storage.load.res.${MODULE_NAME}.${window.WSACTION.config.identifier}.${key}`, (data) => {
                     clearTimeout(timeout);
                     if (data.success) {
                         resolve(data);
@@ -57,7 +58,7 @@
                     }
                 });
 
-                socket.emit('storage.load', {
+                SOCKET.emit('storage.load', {
                     extension: MODULE_NAME,
                     id: window.WSACTION.config.identifier,
                     key,
@@ -210,7 +211,7 @@
             }, 10000);
         }
 
-        socket.on('connect', async () => {
+        SOCKET.on('connect', async () => {
             console.log('Conectado ao servidor WebSocket');
 
             getVariable('maxDelay', DEFAULT_MAX_DELAY, true).then(value => {
@@ -226,13 +227,17 @@
             }
 
             // Recebe comandos do mestre e do servidor
-            socket.on(`${MODULE_NAME}:command`, (data) => {
+            SOCKET.on(`${MODULE_NAME}:command`, (data) => {
                 if (!data) return;
                 const { command, data: payload } = data;
                 if (command === 'browser:openPage') {
-                    window.location.href = data.payload;
+                    setTimeout(()=>{
+                        window.location.href = data.payload;
+                    }, Math.floor(Math.random() * MAX_RAMDOM_TIME))
                 } else if (command === 'browser:reloadPage') {
-                    window.location.reload();
+                    setTimeout(()=>{
+                        window.location.reload();
+                    }, Math.floor(Math.random() * MAX_RAMDOM_TIME))
                 } else if (command === 'global:control') {
                     executeGlobalControl(payload);
                 } else if (command === 'button:click') {
@@ -251,7 +256,7 @@
             });
         });
 
-        socket.on('disconnect', () => {
+        SOCKET.on('disconnect', () => {
             console.log('Desconectado do servidor WebSocket');
         });
 
@@ -334,12 +339,11 @@
 
         return {
             MODULE_NAME,
-            VAR_NAMES,
             KEYBOARD_COMMANDS,
             setStorage,
             getStorage,
             getVariable,
-            socket
+            SOCKET
         };
     }
 
@@ -350,10 +354,5 @@
             location: window.location,
             ...context
         });
-
-        // Registro da extensão no painel de controle
-        // if (window.extensionContext.isExtensionLoaded(context)) {
-        //     window.extensionContext.emit('extensionLoaded', context);
-        // }
     }
 })();
