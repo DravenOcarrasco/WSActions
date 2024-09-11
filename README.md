@@ -10,7 +10,6 @@
 
 ## Pré-requisitos
 - [Bun](https://bun.sh/)
-- [Node.js](https://nodejs.org/) (14+)
 
 ## Instalação
 
