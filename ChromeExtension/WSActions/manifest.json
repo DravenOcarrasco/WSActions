@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "WSActions",
-    "version": "1.0",
+    "version": "2.0",
     "description": "Facilita a injeção de scripts personalizados para auxiliar em processos repetitivos entre vários navegadores.",
     "permissions": [
         "storage",
