@@ -1,7 +1,11 @@
-# Limpa a pasta 'build' se ela existir no início
+# Limpa as pastas de build se existirem
 if (Test-Path build) {
     Remove-Item -Recurse -Force build
     Write-Host "'build' directory has been removed."
+}
+if (Test-Path build-with-node-modules) {
+    Remove-Item -Recurse -Force build-with-node-modules
+    Write-Host "'build-with-node-modules' directory has been removed."
 }
 
 # Remove a pasta 'src-build' se ela existir
@@ -10,64 +14,64 @@ if (Test-Path src-build) {
     Write-Host "'src-build' directory has been removed."
 }
 
-# Transpile TypeScript para JavaScript (se necessário)
+# Transpile TypeScript para JavaScript
 tsc
 
 # Executa o comando nexe-build
 npm run nexe-build
 
-# Cria a pasta 'build' antes de mover o WSActions.exe, caso ainda não exista
+# Cria as pastas de build
 if (!(Test-Path build)) {
     New-Item -ItemType Directory -Path build
 }
+if (!(Test-Path build-with-node-modules)) {
+    New-Item -ItemType Directory -Path build-with-node-modules
+}
 
-# Move WSActions.exe para a pasta 'build'
+# Verifica se o WSActions.exe existe antes de mover
 if (Test-Path WSActions.exe) {
-    Move-Item -Path WSActions.exe -Destination build\
-    Write-Host "WSActions.exe moved to 'build' directory."
+    Copy-Item -Path WSActions.exe -Destination build
+    Copy-Item -Path WSActions.exe -Destination build-with-node-modules
+    Write-Host "WSActions.exe moved to both 'build' directories."
+} else {
+    Write-Host "WSActions.exe not found. Ensure it is generated during the build process."
 }
 
-# Move WSActions.exe para a pasta 'build'
-if (Test-Path UnsecureChromium.bat) {
-    Copy-Item -Path UnsecureChromium.bat -Destination build\
-    Write-Host "UnsecureChromium.bat Copied to 'build' directory."
+# Copia arquivos necessários para ambas as pastas
+$filesToCopy = @('UnsecureChromium.bat', 'public', 'extensions', 'scripts', 'ChromeExtension')
+foreach ($file in $filesToCopy) {
+    Copy-Item -Recurse -Path $file -Destination build\$file
+    Copy-Item -Recurse -Path $file -Destination build-with-node-modules\$file
+    Write-Host "'$file' copied to both 'build' directories."
 }
 
-# Copia a pasta 'public' para 'build\public'
-Copy-Item -Recurse -Path public -Destination build\public
-Write-Host "'public' directory copied to 'build\public'."
+# Copia node_modules apenas para a pasta build-with-node-modules
+Copy-Item -Recurse -Path node_modules -Destination build-with-node-modules\node_modules
+Write-Host "'node_modules' copied to 'build-with-node-modules'."
 
-# Copia a pasta 'extensions' para 'build\extensions'
-Copy-Item -Recurse -Path extensions -Destination build\extensions
-Write-Host "'extensions' directory copied to 'build\extensions'."
-
-# Copia a pasta 'scripts' para 'build\scripts'
-Copy-Item -Recurse -Path scripts -Destination build\scripts
-Write-Host "'scripts' directory copied to 'build\scripts'."
-
-# Copia a pasta 'ChromeExtension' para 'build\ChromeExtension'
-Copy-Item -Recurse -Path ChromeExtension -Destination build\ChromeExtension
-Write-Host "'ChromeExtension' directory copied to 'build\ChromeExtension'."
-
-# Copia a pasta 'node_modules' para 'build\node_modules'
-# Copy-Item -Recurse -Path node_modules -Destination build\node_modules
-# Write-Host "'node_modules' directory copied to 'build\node_modules'."
-
-# Define o diretório de build
-$build_dir = Join-Path (Get-Location) 'build'
-
-# Deleta o arquivo 'extensions/index.ts' se ele existir
-$index_ts = Join-Path $build_dir 'extensions\index.ts'
+# Remove o arquivo 'extensions/index.ts' se ele existir
+$index_ts = Join-Path (Get-Location) 'build\extensions\index.ts'
 if (Test-Path $index_ts) {
     Remove-Item -Force $index_ts
-    Write-Host "'extensions/index.ts' file has been deleted."
+    Write-Host "'extensions/index.ts' file has been deleted from 'build'."
+}
+$index_ts_with_modules = Join-Path (Get-Location) 'build-with-node-modules\extensions\index.ts'
+if (Test-Path $index_ts_with_modules) {
+    Remove-Item -Force $index_ts_with_modules
+    Write-Host "'extensions/index.ts' file has been deleted from 'build-with-node-modules'."
 }
 
-# Remove a pasta 'src-build' se ela existir (etapa final)
-if (Test-Path src-build) {
-    Remove-Item -Recurse -Force src-build
-    Write-Host "'src-build' directory has been removed (final step)."
+# Zipa ambas as pastas de build com -Force
+$zipPath = Join-Path (Get-Location) 'WSAction_build.zip'
+$zipPathWithModules = Join-Path (Get-Location) 'WSAction_build_with_node_modules.zip'
+
+Compress-Archive -Path build\* -DestinationPath $zipPath -Force
+Compress-Archive -Path build-with-node-modules\* -DestinationPath $zipPathWithModules -Force
+
+# Remove o WSActions.exe da raiz após o processo
+if (Test-Path WSActions.exe) {
+    Remove-Item -Path WSActions.exe -Force
+    Write-Host "WSActions.exe removed from the root directory."
 }
 
-Write-Host "Build process completed."
-Pause
+Write-Host "Build process completed and zipped as 'WSAction_build.zip' and 'WSAction_build_with_node_modules.zip'."

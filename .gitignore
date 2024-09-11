@@ -190,3 +190,8 @@ storage.json
 config.json
 open-chrome.lnk
 Run-Server.lnk
+
+build-with-node-modules
+WSAction_build_with_node_modules.zip
+WSAction_build.zip
+WSActions.exe
