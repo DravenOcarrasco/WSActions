@@ -6,7 +6,6 @@
   "scripts": {
     "build": "tsc",
     "nexe-build": "nexe -t windows-x64-14.15.3 .\\src\\index.ts",
-    "start": "node dist/src/index.js",
     "dev": "bun src/index.ts server",
     "postinstall": "node dist/src/setup.js"
   },
