@@ -45,9 +45,12 @@ foreach ($file in $filesToCopy) {
     Write-Host "'$file' copied to both 'build' directories."
 }
 
-# Copia node_modules apenas para a pasta build-with-node-modules
+# Copia node_modules e package.json apenas para a pasta build-with-node-modules
 Copy-Item -Recurse -Path node_modules -Destination build-with-node-modules\node_modules
 Write-Host "'node_modules' copied to 'build-with-node-modules'."
+
+Copy-Item -Path package.json -Destination build-with-node-modules\package.json
+Write-Host "'package.json' copied to 'build-with-node-modules'."
 
 # Remove o arquivo 'extensions/index.ts' se ele existir
 $index_ts = Join-Path (Get-Location) 'build\extensions\index.ts'

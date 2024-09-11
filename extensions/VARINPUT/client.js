@@ -275,40 +275,43 @@
     // Set to keep track of inputs that have the event listener
     const inputsWithListener = new Set();
 
+    const simulateInput = (input, value) => {
+        input.focus();
+        // Força a mudança direta no valor do input
+        const nativeValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        nativeValueSetter.call(input, value);
+        // Cria um evento de input que o React pode detectar
+        const nativeInputEvent = new Event('input', { bubbles: true, cancelable: true });
+        // Dispara o evento 'input' para que o React detecte a mudança
+        input.dispatchEvent(nativeInputEvent);
+        // Cria e dispara o evento de 'change' (opcional, mas pode ser necessário dependendo do form)
+        const nativeChangeEvent = new Event('change', { bubbles: true, cancelable: true });
+        input.dispatchEvent(nativeChangeEvent);
+    };
+
     // Function to observe changes in the DOM
     const observeDOMChanges = () => {
-        console.log('Observing DOM changes...');
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                // Seleciona tanto inputs quanto textareas
-                const inputsAndTextareas = document.querySelectorAll('input, textarea');
-                inputsAndTextareas.forEach((input) => {
-                    // Verifica se já foi adicionado pelo nosso código, usando a flag "data-my-listener"
-                    if (!input.hasAttribute('data-my-listener')) {
-                        input.addEventListener('input', async (event) => {
-                            const value = event.target.value;
-                            const variablePattern = /{{(.*?)}}/g;
-                            let match;
-                            let newValue = value;
-    
-                            while ((match = variablePattern.exec(value)) !== null) {
-                                const variableName = match[1];
-                                // Use the new function to get variable value from VARIABLES or use a default value
-                                const variableValue = context.getVariableFromList(variableName, `{{${variableName}}}`);
-                                newValue = newValue.replace(`{{${variableName}}}`, variableValue);
-                            }
-                            input.value = newValue;
-                        });
-    
-                        // Adiciona o atributo para marcar que o listener foi adicionado
-                        input.setAttribute('data-my-listener', 'true');
-                        inputsWithListener.add(input); // Adiciona ao Set de inputs
-                    }
-                });
-            });
+        // Adiciona um único ouvinte de eventos ao body para capturar inputs
+        document.body.addEventListener('input', async (event) => {
+            const input = event.target;
+
+            // Verifica se o alvo do evento é um input ou textarea
+            if (input.tagName.toLowerCase() === 'input' || input.tagName.toLowerCase() === 'textarea') {
+                const value = input.value;
+                const variablePattern = /{{(.*?)}}/g;
+                let match;
+                let newValue = value;
+
+                // Substitui os padrões {{variavel}} pelo valor da variável correspondente
+                while ((match = variablePattern.exec(value)) !== null) {
+                    const variableName = match[1];
+                    const variableValue = context.getVariableFromList(variableName, `{{${variableName}}}`);
+                    newValue = newValue.replace(`{{${variableName}}}`, variableValue);
+                    simulateInput(input, newValue);
+                }
+                // input.value = value;
+            }
         });
-    
-        observer.observe(document.body, { childList: true, subtree: true });
     };
 
     // Function to show the Swal menu for variable management

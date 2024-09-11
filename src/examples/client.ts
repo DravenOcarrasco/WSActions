@@ -126,7 +126,7 @@ export default function mount(name: string) {
         return {
             MODULE_NAME,
             KEYBOARD_COMMANDS,
-            variableNames,
+            VAR_NAMES,
             setStorage,
             getStorage,
             getVariable,
