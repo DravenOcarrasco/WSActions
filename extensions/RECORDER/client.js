@@ -115,7 +115,7 @@
                 });
 
                 if (recordingTitle) {
-                    socket.emit(`${MODULE_NAME}.make:script`, {
+                    SOCKET.emit(`${MODULE_NAME}.make:script`, {
                         name: recordingTitle,
                         history: await getVariable("record_temp", {})
                     });

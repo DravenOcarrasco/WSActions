@@ -107,7 +107,7 @@
         // Função para enviar comandos
         function sendCommand(command, data) {
             if (isMaster) {
-                socket.emit(`${MODULE_NAME}.master:command`, { command, data });
+                SOCKET.emit(`${MODULE_NAME}.master:command`, { command, data });
             } else {
                 console.log('Este cliente não é o mestre.');
             }
