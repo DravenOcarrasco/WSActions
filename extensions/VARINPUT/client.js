@@ -276,8 +276,12 @@
     const simulateInput = (input, value) => {
         input.focus();
         // Força a mudança direta no valor do input
-        const nativeValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-        nativeValueSetter.call(input, value);
+        try{
+            const nativeValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            nativeValueSetter.call(input, value);
+        }catch{
+            input.value = value;
+        }
         // Cria um evento de input que o React pode detectar
         const nativeInputEvent = new Event('input', { bubbles: true, cancelable: true });
         // Dispara o evento 'input' para que o React detecte a mudança
