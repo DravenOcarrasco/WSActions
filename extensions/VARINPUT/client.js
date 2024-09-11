@@ -314,7 +314,7 @@
     // Function to show the Swal menu for variable management
     const showVariableMenu = async () => {
         const { value: formValues } = await Swal.fire({
-            title: 'Gerenciar Variáveis',
+            title: 'Criar Variável',
             html:
                 '<input id="swal-input1" class="swal2-input" placeholder="Nome da Variável">' +
                 '<input id="swal-input2" class="swal2-input" placeholder="Valor da Variável">',
