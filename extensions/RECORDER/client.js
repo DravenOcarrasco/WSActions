@@ -3,6 +3,26 @@
         const MODULE_NAME = "RECORDER";
         const socket = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/`, { secure: false });
         const VAR_NAMES = ["record_temp", "isRecording"]
+        const KEYBOARD_COMMANDS = [
+            {
+                description: "INIT/STOP RECORD",
+                keys: [ 
+                    {
+                        key: "control", 
+                        upercase: false
+                    },
+                    {
+                        key: "alt", 
+                        upercase: false
+                    },
+                    {
+                        key: "r", 
+                        upercase: false
+                    },
+                ],
+            }
+        ]
+
 
         /**
          * Displays the menu with the provided options.
@@ -222,6 +242,7 @@
         return {
             MODULE_NAME,
             VAR_NAMES,
+            KEYBOARD_COMMANDS,
             showMenu,
             setStorage,
             getStorage,
@@ -238,9 +259,9 @@
             ...context
         });
 
-        // Registro da extensão no painel de controle
-        if (window.extensionContext.isExtensionLoaded(context.MODULE_NAME)) {
-            window.extensionContext.emit('extensionLoaded', context.MODULE_NAME);
-        }
+        // // Registro da extensão no painel de controle
+        // if (window.extensionContext.isExtensionLoaded(context)) {
+        //     window.extensionContext.emit('extensionLoaded', context);
+        // }
     }
 })();

@@ -11,7 +11,7 @@ if (Test-Path src-build) {
 }
 
 # Transpile TypeScript para JavaScript (se necessário)
-# tsc
+tsc
 
 # Executa o comando nexe-build
 npm run nexe-build

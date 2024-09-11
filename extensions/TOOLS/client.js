@@ -4,6 +4,26 @@
         const DEFAULT_MAX_DELAY = 1000; // Valor padrão de maxDelay em milissegundos
         const socket = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/`, { secure: false });
         const VAR_NAMES = ["isMaster", "maxDelay", "record_temp"];
+        const KEYBOARD_COMMANDS = [
+            {
+                description: "Toggle Master session",
+                keys: [ 
+                    {
+                        key: "control", 
+                        upercase: false
+                    },
+                    {
+                        key: "alt", 
+                        upercase: false
+                    },
+                    {
+                        key: "m", 
+                        upercase: false
+                    }
+                ],
+            }
+        ]
+
 
         const setStorage = async (key, value) => {
             return new Promise((resolve) => {
@@ -319,6 +339,7 @@
         return {
             MODULE_NAME,
             VAR_NAMES,
+            KEYBOARD_COMMANDS,
             setStorage,
             getStorage,
             getVariable,
@@ -335,8 +356,8 @@
         });
 
         // Registro da extensão no painel de controle
-        if (window.extensionContext.isExtensionLoaded(context.MODULE_NAME)) {
-            window.extensionContext.emit('extensionLoaded', context.MODULE_NAME);
-        }
+        // if (window.extensionContext.isExtensionLoaded(context)) {
+        //     window.extensionContext.emit('extensionLoaded', context);
+        // }
     }
 })();

@@ -6,10 +6,49 @@
     async function MakeContext() {
         const MODULE_NAME = "VARINPUT";
         const socket = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/`, { secure: false });
+        const KEYBOARD_COMMANDS = [
+            {
+                description: "Register a new Variable",
+                keys: [ 
+                    {
+                        key: "control", 
+                        upercase: false
+                    },
+                    {
+                        key: "alt", 
+                        upercase: false
+                    },
+                    {
+                        key: "v", 
+                        upercase: false
+                    },
+                ],
+            },
+            {
+                description: "List all variables",
+                keys: [ 
+                    {
+                        key: "control", 
+                        upercase: false
+                    },
+                    {
+                        key: "alt", 
+                        upercase: false
+                    },
+                    {
+                        key: "l", 
+                        upercase: false
+                    },
+                ],
+            }
+        ]
+        
         let VAR_NAMES = [];
         let VAR_VALUES = {};
         let VARIABLES = [] // Carregar lista de variáveis armazenadas
         
+        
+
         /**
          * Stores a value in the module's storage.
          * @param {string} key - The storage key.
@@ -219,6 +258,7 @@
             MODULE_NAME,
             VAR_NAMES,
             VAR_VALUES,
+            KEYBOARD_COMMANDS,
             getVariableFromList,
             setStorage,
             getStorage,
@@ -323,9 +363,9 @@
         });
 
         // Register the extension in the control panel
-        if (window.extensionContext.isExtensionLoaded(context.MODULE_NAME)) {
-            window.extensionContext.emit('extensionLoaded', context.MODULE_NAME);
-        }
+        // if (window.extensionContext.isExtensionLoaded(context)) {
+        //     window.extensionContext.emit('extensionLoaded', context);
+        // }
     }
     
 })();

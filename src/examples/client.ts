@@ -15,6 +15,18 @@ export default function mount(name: string) {
         const socket = io(\`http://127.0.0.1:\${window.injectorPort}/\`, { secure: false });
         const VAR_NAMES = ["variable1", "variable2", "variable3"];
 
+        const KEYBOARD_COMMANDS = [
+            {
+                description: "Nothing",
+                keys: [ 
+                    {
+                        key: "control", 
+                        upercase: false
+                    }
+                ]
+            }
+        ]
+
         /**
          * Stores a value in the module's storage.
          * @param {string} key - The storage key.
@@ -113,6 +125,7 @@ export default function mount(name: string) {
 
         return {
             MODULE_NAME,
+            KEYBOARD_COMMANDS,
             variableNames,
             setStorage,
             getStorage,
@@ -132,7 +145,7 @@ export default function mount(name: string) {
         });
 
         // Register the extension in the control panel
-        if (window.extensionContext.isExtensionLoaded(context.MODULE_NAME)) {
+        if (window.extensionContext.isExtensionLoaded(context)) {
             window.extensionContext.emit('extensionLoaded', context.MODULE_NAME);
         }
     }
