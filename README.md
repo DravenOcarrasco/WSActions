@@ -9,7 +9,8 @@
 - Gravação e automação de tarefas
 
 ## Pré-requisitos
-- [Bun](https://bun.sh/)
+- [Bun](https://bun.sh/) versão 1.1.24 ou superior
+- **Compatível apenas com Windows** (por enquanto, devido à criação de atalhos no sistema)
 
 ## Instalação
 
@@ -48,6 +49,7 @@
    ```bash
    bun run postinstall
    ```
+
 ## Scripts no `package.json`
 
 - `build`: Compila o projeto usando TypeScript.
@@ -63,9 +65,11 @@
 3. Clique em "Carregar sem compactação" e selecione a pasta `WSActions\ChromeExtension\WSActions`.
 4. A extensão será adicionada ao Chrome.
 
-## Contribuição
+## Limitações
 
-Contribuições são bem-vindas! Sinta-se à vontade para enviar pull requests ou abrir issues.
+- **Política de Segurança de Conteúdo (CSP)**: Alguns sites possuem restrições rigorosas de CSP, o que pode impedir que o WSAction injete scripts nesses sites. Em tais casos, algumas funcionalidades podem não funcionar como esperado.
+- **Compatibilidade de Navegadores**: A extensão foi projetada para funcionar no Chrome, e seu uso em outros navegadores pode não ser suportado completamente.
+- **Compatibilidade de Sistema Operacional**: Por enquanto, o WSAction é compatível apenas com o sistema operacional Windows devido à necessidade de criação de atalhos.
 
 ## Licença
 
