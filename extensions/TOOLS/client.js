@@ -13,10 +13,6 @@
                         upercase: false
                     },
                     {
-                        key: "alt", 
-                        upercase: false
-                    },
-                    {
                         key: "m", 
                         upercase: false
                     }
