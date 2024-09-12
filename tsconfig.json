@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",                     /* Define a versão da linguagem JavaScript para o JavaScript emitido e inclui declarações de biblioteca compatíveis. */
+    "module": "commonjs",                   /* Especifica qual código de módulo é gerado. */
+    "outDir": "./dist",                     /* Especifica uma pasta de saída para todos os arquivos emitidos. */
+    "esModuleInterop": true,                /* Emite JavaScript adicional para facilitar o suporte à importação de módulos CommonJS. */
+    "forceConsistentCasingInFileNames": true, /* Garante que a capitalização esteja correta nas importações. */
+    "strict": true,                         /* Ativa todas as opções de verificação de tipo estrita. */
+    "skipLibCheck": true                    /* Pula a verificação de tipo de todos os arquivos .d.ts. */
+  },
+  "include": ["src/**/*.ts"],               /* Inclui todos os arquivos TypeScript no diretório src e seus subdiretórios. */
+  "exclude": ["node_modules"]               /* Exclui o diretório node_modules. */
+}

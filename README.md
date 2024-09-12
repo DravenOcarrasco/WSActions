@@ -1,120 +1,76 @@
-
 # WSAction
-WSAction é um projeto que utiliza injetores de JavaScript para estender funcionalidades no navegador. Recomendamos o uso do [Tampermonkey](https://www.tampermonkey.net/) para injetar os scripts.
+
+**WSAction** é uma ferramenta avançada que permite controle e automação entre vários navegadores simultaneamente, utilizando uma arquitetura mestre-escravo. O sistema facilita preenchimentos automáticos e o controle remoto, oferecendo uma interface para gravação de ações e automação de tarefas repetitivas.
+
+## Funcionalidades
+- Controle simultâneo de múltiplos navegadores
+- Preenchimento de campos utilizando variáveis
+- Controle remoto via navegador mestre
+- Gravação e automação de tarefas
 
 ## Pré-requisitos
+- [Bun](https://bun.sh/) versão 1.1.24 ou superior
+- **Compatível apenas com Windows** (por enquanto, devido à criação de atalhos no sistema)
 
-Certifique-se de que você tem o seguinte instalado:
+## Instalação
 
-- [Node.js](https://nodejs.org/) (versão 14 ou superior)
-- [Git](https://git-scm.com/)
-- [Bun](https://bun.sh/)
-- [Tampermonkey](https://www.tampermonkey.net/) (ou outro injetor de JS compatível)
+1. Clone o repositório:
+   ```bash
+   git clone https://github.com/DravenOcarrasco/WSActions.git
+   cd WSActions
+   ```
 
-## Instalação do Bun
+2. Instale as dependências:
+   ```bash
+   bun install
+   ```
 
-Para instalar o Bun, execute o seguinte comando em seu terminal:
+3. Execute o projeto em modo desenvolvimento:
+   ```bash
+   bun run dev
+   ```
 
-```sh
-curl -fsSL https://bun.sh/install | bash
-```
+4. Ou execute o projeto diretamente:
+   ```bash
+   bun .\src\index.ts server
+   ```
 
-Após a instalação, adicione o Bun ao seu `PATH` executando:
+5. Para compilar o projeto:
+   ```bash
+   bun run build
+   ```
 
-```sh
-export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
-```
+6. Para criar um binário com `nexe`:
+   ```bash
+   bun run nexe-build
+   ```
 
-Certifique-se de adicionar essas linhas ao seu arquivo de configuração do shell (`.bashrc`, `.zshrc`, etc.) para que o Bun esteja disponível em novas sessões de terminal.
+7. Após a instalação, execute o script de configuração:
+   ```bash
+   bun run postinstall
+   ```
 
-## Configuração do Projeto
+## Scripts no `package.json`
 
-1. Clone este repositório:
+- `build`: Compila o projeto usando TypeScript.
+- `nexe-build`: Cria um binário para Windows utilizando o `nexe`.
+- `dev`: Executa o servidor diretamente com TypeScript.
+- `start`: Inicia o servidor usando o código compilado.
+- `postinstall`: Executa o script de setup após a instalação.
 
-```sh
-git clone https://github.com/DravenOcarrasco/WSActions.git
-cd WSAction
-```
+## Instalação da Extensão do Chrome
 
-2. Instale as dependências do projeto usando Bun:
+1. Acesse a pasta `WSActions\ChromeExtension\WSActions`.
+2. No Chrome, abra `chrome://extensions/` e ative o **Modo Desenvolvedor**.
+3. Clique em "Carregar sem compactação" e selecione a pasta `WSActions\ChromeExtension\WSActions`.
+4. A extensão será adicionada ao Chrome.
 
-```sh
-bun install
-```
+## Limitações
 
-## Uso
+- **Política de Segurança de Conteúdo (CSP)**: Alguns sites possuem restrições rigorosas de CSP, o que pode impedir que o WSAction injete scripts nesses sites. Em tais casos, algumas funcionalidades podem não funcionar como esperado.
+- **Compatibilidade de Navegadores**: A extensão foi projetada para funcionar no Chrome, e seu uso em outros navegadores pode não ser suportado completamente.
+- **Compatibilidade de Sistema Operacional**: Por enquanto, o WSAction é compatível apenas com o sistema operacional Windows devido à necessidade de criação de atalhos.
 
-### Scripts Disponíveis
+## Licença
 
-- `bun run start`: Inicia o servidor de desenvolvimento.
-- `bun run build`: Compila o projeto para produção.
-
-Para executar qualquer um desses scripts, use o comando `bun run <script>`.
-
-### Desenvolvimento
-
-Para iniciar o servidor de desenvolvimento, execute:
-
-```sh
-bun run start
-```
-
-Abra [http://127.0.0.1:9514](http://127.0.0.1:9514) para ver o projeto em execução.
-
-### Compilação
-
-Para compilar o projeto para produção e copiar os arquivos de `src/extension` para `dist`, execute:
-
-```sh
-bun run build
-```
-
-Os arquivos compilados serão gerados na pasta `dist`.
-
-## Uso do Tampermonkey
-
-1. Instale o [Tampermonkey](https://www.tampermonkey.net/) em seu navegador.
-
-2. Habilite o modo de desenvolvedor no gerenciador de extensões do Chrome:
-    - Abra o Chrome e vá para `chrome://extensions/`.
-    - Ative a opção "Modo de desenvolvedor" no canto superior direito.
-
-3. Adicione o seguinte script ao Tampermonkey:
-
-```javascript
-// ==UserScript==
-// @name         WebSocket Client for Tampermonkey
-// @namespace    http://tampermonkey.net/
-// @version      0.2
-// @description  Connects to a secure WebSocket server and performs actions based on commands received
-// @author       Your Name
-// @match        *://*/*
-// @grant        none
-// ==/UserScript==
-
-(function () {
-    'use strict';
-
-    // Incluindo o script remoto
-    const clientScript = document.createElement('script');
-    clientScript.src = 'http://127.0.0.1:8080/client.js';
-    document.head.appendChild(clientScript);
-
-    clientScript.onload = () => {
-        console.log('client.js carregado com sucesso');
-    };
-
-    clientScript.onerror = () => {
-        console.error('Erro ao carregar client.js');
-    };
-})();
-```
-
-4. Salve e habilite o script no Tampermonkey.
-
-5. Acesse a página [http://127.0.0.1:9514/extensions](http://127.0.0.1:9514/extensions) para permitir o acesso ao HTTPS auto-assinado.
-
-## Contribuição
-
-Sinta-se à vontade para abrir issues e pull requests para melhorias e correções.
+Este projeto está licenciado sob a [MIT License](LICENSE).

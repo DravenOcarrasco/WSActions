@@ -1,5 +1,7 @@
 # Based on https://raw.githubusercontent.com/github/gitignore/main/Node.gitignore
 
+.vscode
+
 # Logs
 
 certificate.pem
@@ -178,4 +180,19 @@ dist
 .DS_Store
 /build
 /bin
+
+/src-build
+/profiles_data
+/profiles
+/shortcuts
+
 storage.json
+config.json
+open-chrome.lnk
+Run-Server.lnk
+
+build-with-node-modules
+WSAction_build_with_node_modules
+WSAction_build_with_node_modules.zip
+WSAction_build.zip
+WSActions.exe
