@@ -275,20 +275,37 @@
 
     const simulateInput = (input, value) => {
         input.focus();
+        // Adiciona o atributo customizado 'data-programmatically-changed' para detectar externamente
+        input.setAttribute('data-programmatically-changed', 'true');
+
         // Força a mudança direta no valor do input
-        try{
+        try {
             const nativeValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
             nativeValueSetter.call(input, value);
-        }catch{
+        } catch {
             input.value = value;
+            // Cria um evento de input que o React pode detectar
+            const nativeInputEvent = new CustomEvent('input', {
+                bubbles: true,
+                cancelable: true,
+                detail:{
+                    ignore: true
+                }
+            });
+        
+            // Dispara o evento 'input' para que o React detecte a mudança
+            input.dispatchEvent(nativeInputEvent);
+        
+            // Cria e dispara o evento de 'change' (opcional, mas pode ser necessário dependendo do form)
+            // const nativeChangeEvent = new CustomEvent('change', {
+            //     bubbles: true,
+            //     cancelable: true,
+            // });
+        
+            // input.dispatchEvent(nativeChangeEvent);
         }
-        // Cria um evento de input que o React pode detectar
-        const nativeInputEvent = new Event('input', { bubbles: true, cancelable: true });
-        // Dispara o evento 'input' para que o React detecte a mudança
-        input.dispatchEvent(nativeInputEvent);
-        // Cria e dispara o evento de 'change' (opcional, mas pode ser necessário dependendo do form)
-        const nativeChangeEvent = new Event('change', { bubbles: true, cancelable: true });
-        input.dispatchEvent(nativeChangeEvent);
+    
+        
     };
 
     // Function to observe changes in the DOM

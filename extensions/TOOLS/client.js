@@ -115,6 +115,18 @@
 
         // Função para capturar ações e enviá-las ao servidor
         function captureAction(event) {
+            
+            // Verifica se o alvo do evento (elemento de input) tem o atributo 'data-programmatically-changed'
+            if (event.target && event.target.hasAttribute('data-programmatically-changed')) {
+                // Remove o atributo 'data-programmatically-changed'
+                event.target.removeAttribute('data-programmatically-changed');
+                return;
+            }
+
+            if(event && event.detail && event.detail.ignore){
+                return
+            }
+
             if (isMaster && !isExecuting) {
                 const element = event.target;
                 const tagName = element.tagName;
