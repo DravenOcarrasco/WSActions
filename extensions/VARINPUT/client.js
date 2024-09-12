@@ -290,22 +290,21 @@
             nativeValueSetter.call(input, value);
         } catch {
             input.value = value;
+            // Cria um evento de input que o React pode detectar
+            const nativeInputEvent = new CustomEvent('input', {
+                bubbles: true,
+                cancelable: true,
+                detail: {
+                    ignore: true
+                }
+            });
+        
+            // Dispara o evento 'input' para que o React detecte a mudança
+            input.dispatchEvent(nativeInputEvent);
+        
+            // Remove o atributo após a simulação para evitar chamadas subsequentes
+            input.removeAttribute('data-programmatically-changed');
         }
-    
-        // Cria um evento de input que o React pode detectar
-        const nativeInputEvent = new CustomEvent('input', {
-            bubbles: true,
-            cancelable: true,
-            detail: {
-                ignore: true
-            }
-        });
-    
-        // Dispara o evento 'input' para que o React detecte a mudança
-        input.dispatchEvent(nativeInputEvent);
-    
-        // Remove o atributo após a simulação para evitar chamadas subsequentes
-        input.removeAttribute('data-programmatically-changed');
     };
 
     // Function to observe changes in the DOM
