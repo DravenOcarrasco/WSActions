@@ -94,7 +94,7 @@
 
             isProcessing = true; // Iniciar processamento
             const { payload } = actionQueue.shift();
-            const delay = Math.floor(Math.random() * maxDelay) + 1000; // Atraso aleatório entre 1 e maxDelay segundos
+            const delay = Math.floor(Math.random() * maxDelay); // Atraso aleatório entre 1 e maxDelay segundos
 
             setTimeout(() => {
                 isExecuting = true;
@@ -325,7 +325,7 @@
                     title: 'Definir atraso máximo',
                     input: 'number',
                     inputLabel: 'Digite o novo tempo máximo de atraso em segundos',
-                    inputValue: maxDelay / 1000,
+                    inputValue: maxDelay * 1000,
                     showCancelButton: true,
                     inputValidator: (value) => {
                         if (!value || isNaN(value) || value <= 0) {
