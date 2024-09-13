@@ -272,38 +272,110 @@
 
     // Set to keep track of inputs that have the event listener
     const inputsWithListener = new Set();
+    
+    function detectFramework() {
+        // Verifica variáveis globais específicas dos frameworks
+    
+        // Verifica se Next.js está presente via variável global
+        if (typeof window.__NEXT_DATA__ !== 'undefined') {
+            return 'Next.js';
+        }
+    
+        // Verifica se Gatsby está presente via variável global
+        if (typeof window.___gatsby !== 'undefined') {
+            return 'Gatsby';
+        }
+    
+        // Verifica se Nuxt.js está presente via variável global
+        if (typeof window.$nuxt !== 'undefined') {
+            return 'Nuxt.js';
+        }
+    
+        // Verifica se React está presente via variável global
+        if (typeof window.React !== 'undefined') {
+            return 'React';
+        }
+    
+        // Se as variáveis globais não forem encontradas, verifica o conteúdo do <head>
+        const headContent = document.head.innerHTML;
+    
+        // Verifica padrões no head para Next.js
+        if (headContent.includes('/_next/')) {
+            return 'Next.js';
+        }
+    
+        // Verifica padrões no head para Gatsby
+        if (headContent.includes('gatsby') || headContent.includes('/static/')) {
+            return 'Gatsby';
+        }
+    
+        // Verifica padrões no head para Nuxt.js
+        if (headContent.includes('/_nuxt/')) {
+            return 'Nuxt.js';
+        }
+    
+        // Verifica presença de React no conteúdo do head (React puro)
+        if (headContent.includes('React')) {
+            return 'React';
+        }
+    
+        // Retorna vazio se nenhum framework for detectado
+        return '';
+    }
+
+    
+
+    var FRAMEWORK_NAME = "";
+    var __VERIFIED = false;
 
     const simulateInput = (input, value) => {
         // Verifica se o evento foi disparado programaticamente e evita a recursão infinita
         if (input.getAttribute('data-programmatically-changed') === 'true') {
             return;
         }
+        // Verifica se o framework já foi detectado
+        if (!__VERIFIED) {
+            FRAMEWORK_NAME = detectFramework(); // Detecta o framework uma única vez
+            __VERIFIED = true;
+        }
     
         input.focus();
-        
-        // Adiciona o atributo customizado 'data-programmatically-changed' para detectar externamente
-        input.setAttribute('data-programmatically-changed', 'true');
+        console.log(`NAME: ${FRAMEWORK_NAME}`);
+        switch (FRAMEWORK_NAME) {
+            case "React":
+                const nativeValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                nativeValueSetter.call(input, value);
+                break;
     
-        // Força a mudança direta no valor do input
-        try {
-            const nativeValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-            nativeValueSetter.call(input, value);
-        } catch {
-            input.value = value;
-            // Cria um evento de input que o React pode detectar
-            const nativeInputEvent = new CustomEvent('input', {
-                bubbles: true,
-                cancelable: true,
-                detail: {
-                    ignore: true
-                }
-            });
-        
-            // Dispara o evento 'input' para que o React detecte a mudança
-            input.dispatchEvent(nativeInputEvent);
-        
-            // Remove o atributo após a simulação para evitar chamadas subsequentes
-            input.removeAttribute('data-programmatically-changed');
+            case "Next.js":
+                const nextValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                nextValueSetter.call(input, value);
+                break;
+    
+            case "Gatsby":
+                const gatsbyValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                gatsbyValueSetter.call(input, value);
+                break;
+    
+            case "Nuxt.js":
+                input.value = value;
+                const vueInputEvent = new Event('input', { bubbles: true });
+                input.dispatchEvent(vueInputEvent);
+                break;
+    
+            default:
+                input.setAttribute('data-programmatically-changed', 'true');
+                input.value = value;
+                const nativeInputEvent = new CustomEvent('input', {
+                    bubbles: true,
+                    cancelable: true,
+                    detail: {
+                        ignore: true
+                    }
+                });
+                input.dispatchEvent(nativeInputEvent);
+                input.removeAttribute('data-programmatically-changed');
+                break;
         }
     };
 
@@ -312,7 +384,6 @@
         // Adiciona um único ouvinte de eventos ao body para capturar inputs
         document.body.addEventListener('input', async (event) => {
             const input = event.target;
-
             // Verifica se o alvo do evento é um input ou textarea
             if (input.tagName.toLowerCase() === 'input' || input.tagName.toLowerCase() === 'textarea') {
                 const value = input.value;
