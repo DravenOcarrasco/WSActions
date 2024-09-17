@@ -1,5 +1,5 @@
 import puppeteer from 'puppeteer-extra';
-import { Browser, Page, Frame } from 'puppeteer';
+import { Browser, Page, Frame, Target } from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 import { ScriptInjector } from './scriptInjector';
@@ -70,14 +70,33 @@ function getProfilesData(): ProfilesData {
     return JSON.parse(profilesContent);
 }
 
-// Launch a new Chrome instance
-async function launchChrome(profileName: string, extensions: string[], profileInfo:ChromeProfileInfo): Promise<ChromeInstance> {
+// Função para navegar para uma URL de maneira segura
+async function safeGoto(page: Page, url: string): Promise<void> {
+    if (!page.isClosed()) {
+        try {
+            await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
+        } catch (error: any) {
+            if (error.message.includes('Frame was detached')) {
+                console.warn('Frame was detached during navigation, retrying...');
+                await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
+            } else {
+                console.error('Error navigating:', error.message);
+                throw error; // Rethrow other errors
+            }
+        }
+    } else {
+        console.warn('Page is already closed, cannot navigate.');
+    }
+}
+
+// Função para lançar uma nova instância do Chrome
+async function launchChrome(profileName: string, extensions: string[], profileInfo: ChromeProfileInfo): Promise<ChromeInstance> {
     const extensionPaths = extensions.join(',');
     const args = [
-        '--disable-web-security', // Disable web security
-        '--disable-features=IsolateOrigins,site-per-process', // Disable site isolation
-        '--allow-running-insecure-content', // Allow running insecure content
-        '--disable-features=TrustedTypes', // Disable TrustedTypes
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--allow-running-insecure-content',
+        '--disable-features=TrustedTypes',
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--enable-gpu',
@@ -90,13 +109,13 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
     }
 
     const browser = await puppeteer.launch({
-        headless: profileInfo.headless, // Set headless to false to open the browser with a UI
+        headless: profileInfo.headless,
         executablePath: config.chromeExecutablePath,
         userDataDir: path.join(profilePath, profileName),
         args
     });
 
-    browser.on('targetcreated', async (target) => {
+    browser.on('targetcreated', async (target: Target) => {
         try {
             const newPage = await target.page();
             if (newPage) {
@@ -106,26 +125,48 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
             console.error('Error setting up new page:', error);
         }
     });
-    
+
+    // Função para monitorar se há páginas abertas e fechar o navegador se não houver
+    const monitorPages = async () => {
+        while (true) {
+            const pages = await browser.pages();
+            if (pages.length === 0) {
+                console.log(`Nenhuma página aberta no perfil ${profileName}. Fechando navegador...`);
+                await browser.close();
+                instances = instances.filter(i => i.browser !== browser);
+                break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Verificar a cada segundo
+        }
+    };
+
     let [page] = await browser.pages();
     if (!page) {
         page = await browser.newPage();
     }
 
-    await page.goto(config.defaultPageUrl,{ waitUntil: 'networkidle0' });
+    try {
+        await safeGoto(page, config.defaultPageUrl);
+    } catch (error: any) {
+        if (error.message && error.message.includes('Navigating frame was detached')) {
+            console.warn('Frame was detached during navigation, retrying...');
+        } else {
+            console.error('Error navigating to default page:', error);
+        }
+    }
 
-    if(profileInfo.proxy && profileInfo.proxy.enabled){
+    if (profileInfo.proxy && profileInfo.proxy.enabled) {
         await page.authenticate({
             username: profileInfo.proxy.user,
             password: profileInfo.proxy.passw,
         });
     }
-    
+
     try {
-        await page.goto(config.defaultPageUrl, { waitUntil: 'networkidle0' });
+        await safeGoto(page, config.defaultPageUrl);
         await page.reload({ waitUntil: 'networkidle0' });
     } catch (error) {
-        console.error('Error navigating to default page:', error);
+        //console.error('Error navigating to default page:', error);
     }
 
     try {
@@ -133,7 +174,10 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
     } catch (error) {
         console.error('Error setting up main page:', error);
     }
-    
+
+    // Iniciar monitoramento de páginas
+    monitorPages();
+
     const instance = { browser, page };
     instances.push(instance);
     return instance;
@@ -142,21 +186,16 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
 // Setup page settings and script injection
 async function setupPage(page: Page, profileName: string): Promise<void> {
     try {
-        await page.setBypassCSP(true); // Bypass CSP
-        // // await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36')
-        // await page.setViewport({ 
-        //     width: config.chromeConfig.viewportWidth, 
-        //     height: config.chromeConfig.viewportHeight 
-        // });
+        // Bypass CSP (Content Security Policy)
+        await page.setBypassCSP(true);
 
         // Function to inject the script
         const injectScripts = async () => {
-            await page.setBypassCSP(true);
             try {
-                const ip = '127.0.0.1'; // ou pegue de uma variável
-                const port = 9514; // ou de uma variável
+                const ip = '127.0.0.1'; // Pode ser variável
+                const port = 9514; // Pode ser variável
                 const identifier = profileName;
-                const delay = 1; // ou de uma variável
+                const delay = 1; // Pode ser variável
 
                 // Criar o script como string
                 const script = `
@@ -171,47 +210,23 @@ async function setupPage(page: Page, profileName: string): Promise<void> {
                     };
                 `;
                 await scriptInjector.injectScriptFromString(page, script);
-                await injectScript(page);
             } catch (error) {
                 console.error('Error during script injection:', error);
             }
         };
-        
-        // Initial script injection
+
+        // Inject scripts when the page is loaded
         page.once('load', injectScripts);
 
-        // Event listeners for frame navigation
+        // Reinject scripts when the main frame navigates
         page.on('framenavigated', async (frame) => {
             if (frame === page.mainFrame()) {
                 await injectScripts();
             }
         });
 
-        page.on('framenavigationfailed', async (frame: any) => {
-            const mainFrame = page.mainFrame() as Frame; // Cast explícito do frame principal
-            if (frame === mainFrame) {
-                console.error('Main frame navigation failed, checking if frame is detached...');
-                if (!mainFrame.detached) {
-                    await injectScripts();
-                } else {
-                    console.error('Frame is detached, skipping script injection.');
-                }
-            }
-        });
-
-        // Handle popups
-        page.on('popup', async (popupPage: Page | null) => {
-            if (popupPage) {
-                try {
-                    await setupPage(popupPage, profileName);
-                } catch (error) {
-                    console.error('Error during popup setup:', error);
-                }
-            }
-        });
-
     } catch (error) {
-        console.error('Error during page setup:', error);
+        //console.error('Error during page setup:', error);
     }
 }
 
