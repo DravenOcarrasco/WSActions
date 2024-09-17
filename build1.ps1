@@ -10,23 +10,26 @@ if (Test-Path src-build) {
     Write-Host "'src-build' directory has been removed."
 }
 
-# Transpile TypeScript para JavaScript
-tsc
-
-# Executa o comando nexe-build
-npm run nexe-build
-
-# Cria a pasta de build
+# Cria a pasta de build se não existir
 if (!(Test-Path build)) {
     New-Item -ItemType Directory -Path build
 }
 
-# Verifica se o WSActions.exe existe antes de mover
-if (Test-Path WSActions.exe) {
-    Copy-Item -Path WSActions.exe -Destination build
-    Write-Host "WSActions.exe moved to 'build' directory."
+# Transpila o TypeScript usando SWC e o arquivo .swcrc
+Write-Host "Transpiling TypeScript to JavaScript using SWC..."
+npx swc .\ --out-dir build --config-file .swcrc
+Write-Host "Transpilation completed using SWC."
+
+# Compila com o Bun e gera um executável
+Write-Host "Compiling with Bun to generate an executable..."
+bun build .\build\src\index.js --outfile .\build\WSActions --compile
+Write-Host "Executable created with Bun."
+
+# Verifica se o WSActions.exe (ou apenas WSActions) existe antes de mover
+if (Test-Path .\build\WSActions) {
+    Write-Host "WSActions.exe successfully created in the 'build' directory."
 } else {
-    Write-Host "WSActions.exe not found. Ensure it is generated during the build process."
+    Write-Host "WSActions.exe not found. Ensure Bun was able to generate the executable."
 }
 
 # Copia arquivos necessários para a pasta de build
@@ -50,15 +53,15 @@ if (Test-Path $index_ts) {
     Write-Host "'extensions/index.ts' file has been deleted from 'build'."
 }
 
-# Zipa a pasta de build com -Force
+# COMENTADO: Zipa a pasta de build com -Force (descomente se necessário)
 $zipPath = Join-Path (Get-Location) 'WSAction_build.zip'
-
 Compress-Archive -Path build\* -DestinationPath $zipPath -Force
+Write-Host "Build process completed and zipped as 'WSAction_build.zip'."
 
-# Remove o WSActions.exe da raiz após o processo
+# Remove o WSActions.exe da raiz após o processo (se existir algum na raiz)
 if (Test-Path WSActions.exe) {
     Remove-Item -Path WSActions.exe -Force
     Write-Host "WSActions.exe removed from the root directory."
 }
 
-Write-Host "Build process completed and zipped as 'WSAction_build.zip'."
+Write-Host "Build process completed successfully."

@@ -1,24 +1,28 @@
 {
   "name": "wsaction",
   "version": "2.2.2",
-  "main": "dist/src/index.js",
-  "bin": "dist/src/index.js",
+  "main": "tsc-build/src/index.js",
+  "bin": "tsc-build/src/index.js",
   "scripts": {
     "build": "tsc",
-    "nexe-build": "nexe -t windows-x64-14.15.3 .\\src\\index.ts",
+    "nexe-build": "nexe -t windows-x64-22.0.0 .\\src\\index.ts -o .\\dist\\WSActions.exe --resources ./node_modules/puppeteer/**/* --resources ./assets/**/* --rc-CompanyName='Sua Empresa' --rc-FileDescription='WSActions - Gerenciador de ações da web' --rc-ProductName='WSActions'",
+    "pkg-build": "pkg package.json --icon ./assets/icons/wsaction.ico --output build/WSAction",
     "dev": "bun src/index.ts server",
-    "postinstall": "node dist/src/setup.js"
+    "postinstall": "node tsc-build/src/setup.js"
   },
   "pkg": {
     "scripts": [
-      "dist/src/setup.js"
+      "tsc-build/src/setup.js",
+      "node_modules/puppeteer-extra/**/*",
+      "node_modules/puppeteer-extra-plugin-stealth/**/*"
     ],
     "assets": [
-      "node_modules/puppeteer/.local-chromium/**/*"
+      "node_modules/puppeteer/.local-chromium/**/*",
+      "node_modules/puppeteer-extra-plugin-stealth/evasions/**/*",
+      "node_modules/puppeteer-extra-plugin-stealth/**/*",
+      "node_modules/puppeteer-extra-plugin-stealth/evasions/**/*.js"
     ],
     "targets": [
-      "node16-linux-x64",
-      "node16-macos-x64",
       "node16-win-x64"
     ]
   },
@@ -27,37 +31,37 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@swc/cli": "^0.4.1-nightly.20240914",
+    "@swc/core": "^1.7.26",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@types/node": "^20.14.9",
+    "@types/node": "^20.16.5",
     "@types/node-schedule": "^2.1.7",
-    "@types/prompt": "^1.1.8",
+    "@types/prompt": "^1.1.9",
     "@types/prompts": "^2.4.9",
     "@types/socket.io": "^3.0.2",
-    "@types/ws": "^8.5.10",
+    "@types/ws": "^8.5.12",
     "nexe": "^4.0.0-rc.6",
     "ts-node": "^10.9.2",
-    "typescript": "^5.5.2"
+    "typescript": "^5.6.2"
   },
   "dependencies": {
     "@cloudflare/puppeteer": "^0.0.11",
-    "@swc/cli": "^0.4.0",
-    "@swc/core": "^1.6.6",
-    "@types/yargs": "^17.0.32",
+    "@types/yargs": "^17.0.33",
     "cloudflare-puppeteer-extra": "^1.0.1",
     "cors": "^2.8.5",
-    "express": "^4.19.2",
+    "express": "^4.21.0",
     "node-schedule": "^2.1.1",
     "prompts": "^2.4.2",
-    "puppeteer": "^22.13.1",
-    "puppeteer-core": "^22.12.1",
+    "puppeteer": "^23.3.0",
+    "puppeteer-core": "^23.3.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-recaptcha": "^3.6.8",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "socket.io": "^4.7.5",
     "socket.io-client": "^4.7.5",
     "windows-shortcuts": "^0.1.6",
-    "winston": "^3.13.0",
-    "ws": "^8.17.1"
+    "winston": "^3.14.2",
+    "ws": "^8.18.0"
   }
 }

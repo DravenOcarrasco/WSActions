@@ -181,6 +181,7 @@ dist
 /build
 /bin
 
+/tsc-build
 /src-build
 /profiles_data
 /profiles
@@ -196,3 +197,4 @@ WSAction_build_with_node_modules
 WSAction_build_with_node_modules.zip
 WSAction_build.zip
 WSActions.exe
+WSAction_build_*-ALPHA.zip
