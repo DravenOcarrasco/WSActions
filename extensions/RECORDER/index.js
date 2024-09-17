@@ -89,26 +89,26 @@ module.exports = (WSIO, APP, RL, STORAGE, EXPRESS) => {
 
     const generatePuppeteerScript = (history) => {
         let script = `
-/**
- * Puppeteer script generated based on user actions history.
- * This script automates the browser to replicate user interactions.
- *
- * @param {object} browser - The Puppeteer browser instance.
- * @see {@link https://pptr.dev/|Puppeteer Documentation}
- */
+const { Browser, Page } = require("puppeteer");
 
 async function addDelay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-async function executeScript(browser) {
+/**
+ * Puppeteer script generated based on user actions history.
+ * This script automates the browser to replicate user interactions.
+ *
+ * @param {Browser} browser - The Puppeteer browser instance.
+ * @see {@link https://pptr.dev/|Puppeteer Documentation}
+ */
+async function runScript(browser) {
     /**
      * Opens a new page or brings to front an existing page matching the URL pattern.
      *
      * @param {string} urlPattern - The URL pattern to match.
-     * @returns {object} page - The Puppeteer page instance.
+     * @returns {Page} page - The Puppeteer page instance.
      */
-    async function goToPageIfNotOpen(urlPattern) {
+    async function goToPageIfNotOpen(urlPattern, extraDelay = 1000) {
         const pages = await browser.pages();
         const regex = new RegExp(urlPattern);
         for (let p of pages) {
@@ -120,8 +120,40 @@ async function executeScript(browser) {
             }
         }
         let page = await browser.newPage();
-        await page.goto(urlPattern, { waitUntil: 'networkidle2', timeout: 30000 });
+        await page.goto(urlPattern, { waitUntil: 'load', timeout: 60000 });
+
+        // Wait for the extra delay if specified
+        if (extraDelay > 0) {
+            await addDelay(extraDelay);
+        }
+
         return page;
+    }
+    
+    /**
+     * Finds an element using XPath and waits for it to be present.
+     *
+     * @param {Page} page - The Puppeteer page instance.
+     * @param {string} xpath - The XPath expression to find the element.
+     * @param {number} [timeout=60000] - The timeout in milliseconds to wait for the element.
+     * @returns {Promise<ElementHandle|null>} - The ElementHandle if found, or null if not found.
+     */
+    async function getElementByXPath(page, xpath, timeout = 60000) {
+        try {
+            // Adjust the XPath if it starts with '//*' or '//'
+            let adjustedXPath = xpath;
+            if (xpath.startsWith('//*') || xpath.startsWith('//')) {
+                adjustedXPath = 'xpath//' + xpath;
+            }
+            // Wait for the element to be present
+            await page.waitForSelector(adjustedXPath, { timeout });
+            // Get the element
+            const element = await page.$(adjustedXPath);
+            return element;
+        } catch (error) {
+            console.error(\`Element not found for XPath: \${xpath}\`);
+            return null;
+        }
     }
 
     let page = null;
@@ -140,9 +172,10 @@ async function executeScript(browser) {
         }
 
         script += `
+    browser.close();
 }
 
-module.exports = { executeScript };
+module.exports = { runScript };
 `;
         return script;
     };

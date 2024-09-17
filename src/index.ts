@@ -16,28 +16,74 @@ import prompts from 'prompts';
 
 const IoPort = 9532;
 // Função para criar um atalho usando PowerShell
-function createShortcut(executablePath: string, shortcutName: string, args: string) {
-    const shortcutPath = path.join(process.cwd(), `${shortcutName}.lnk`);
-    if (fs.existsSync(shortcutPath)) {
-        // console.log(`Shortcut ${shortcutName} already exists.`);
-        return Promise.resolve(`Shortcut ${shortcutName} already exists.`);
-    }
-    const powershellScript = `
-        $WScriptShell = New-Object -ComObject WScript.Shell;
-        $Shortcut = $WScriptShell.CreateShortcut('${shortcutPath}');
-        $Shortcut.TargetPath = '${executablePath}';
-        $Shortcut.Arguments = '${args}';
-        $Shortcut.Save();
-    `;
-    const encodedCommand = Buffer.from(powershellScript, 'utf16le').toString('base64');
+function createShortcut(executablePath: string, shortcutName: string, args: string): Promise<string> {
+    const platform = process.platform;
+    const currentDir = process.cwd();
+
     return new Promise((resolve, reject) => {
-        exec(`powershell -EncodedCommand ${encodedCommand}`, (error, stdout, stderr) => {
-            if (error) {
-                reject(`Error creating shortcut: ${error}`);
-            } else {
-                resolve(`Shortcut ${shortcutName} created successfully.`);
+        if (platform === 'win32') {
+            // Windows
+            const shortcutPath = path.join(currentDir, `${shortcutName}.lnk`);
+            if (fs.existsSync(shortcutPath)) {
+                return resolve(`Shortcut ${shortcutName} already exists.`);
             }
-        });
+            const powershellScript = `
+                $WScriptShell = New-Object -ComObject WScript.Shell;
+                $Shortcut = $WScriptShell.CreateShortcut('${shortcutPath}');
+                $Shortcut.TargetPath = '${executablePath}';
+                $Shortcut.Arguments = '${args}';
+                $Shortcut.WorkingDirectory = '${currentDir}';
+                $Shortcut.Save();
+            `;
+            const encodedCommand = Buffer.from(powershellScript, 'utf16le').toString('base64');
+            exec(`powershell -EncodedCommand ${encodedCommand}`, (error, stdout, stderr) => {
+                if (error) {
+                    reject(`Error creating shortcut: ${error}`);
+                } else {
+                    resolve(`Shortcut ${shortcutName} created successfully.`);
+                }
+            });
+        } else if (platform === 'darwin') {
+            // macOS
+            const shortcutPath = path.join(currentDir, `${shortcutName}.alias`);
+            if (fs.existsSync(shortcutPath)) {
+                return resolve(`Shortcut ${shortcutName} already exists.`);
+            }
+            const applescript = `
+                tell application "Finder"
+                    make alias file to POSIX file "${executablePath}" at POSIX file "${currentDir}"
+                    set name of result to "${shortcutName}.alias"
+                end tell
+            `;
+            exec(`osascript -e '${applescript}'`, (error, stdout, stderr) => {
+                if (error) {
+                    reject(`Error creating shortcut: ${error}`);
+                } else {
+                    resolve(`Shortcut ${shortcutName} created successfully.`);
+                }
+            });
+        } else if (platform === 'linux') {
+            // Linux
+            const shortcutPath = path.join(currentDir, `${shortcutName}.desktop`);
+            if (fs.existsSync(shortcutPath)) {
+                return resolve(`Shortcut ${shortcutName} already exists.`);
+            }
+            const desktopEntry = `[Desktop Entry]
+                Name=${shortcutName}
+                Exec=${executablePath} ${args}
+                Type=Application
+                Terminal=false
+            `;
+            fs.writeFile(shortcutPath, desktopEntry, { mode: 0o755 }, (err) => {
+                if (err) {
+                    reject(`Error creating shortcut: ${err}`);
+                } else {
+                    resolve(`Shortcut ${shortcutName} created successfully.`);
+                }
+            });
+        } else {
+            reject(`Unsupported platform: ${platform}`);
+        }
     });
 }
 createShortcut(path.resolve(process.execPath), 'Run-Server', 'server')

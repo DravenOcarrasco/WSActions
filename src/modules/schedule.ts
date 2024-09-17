@@ -59,19 +59,22 @@ const loadSchedules = (): ScheduledTask[] => {
 // Função para abrir um perfil do Chrome e injetar scripts
 const openProfile = async (profileName: string, scripts: string[]) => {
     try {
-        const instance = await ChromeManager.launchProfilesByName(profileName);
-        (async ()=>{
-            for (const script of scripts) {
-                try {
-                    const scriptPath = path.resolve(config.scriptsPath, script);
-                    const extensionModule = require(scriptPath);
-                    await extensionModule.executeScript(instance[0].browser)
-                } catch (error:any) {
-                    instance[0].browser.close()
-                    console.log(error)
+        const instances = await ChromeManager.launchProfilesByName(profileName);
+        for(let instance of instances){
+            (async ()=>{
+                for (const script of scripts) {
+                    try {
+                        const scriptPath = path.resolve(config.scriptsPath, script);
+                        const extensionModule = require(scriptPath);
+                        await extensionModule.runScript(instance.browser)
+                    } catch (error:any) {
+                        instance.browser.close()
+                        console.log(error)
+                    }
                 }
-            }
-        })()
+            })()
+        }
+        
     } catch (err) {
         if (err instanceof Error) {
             logger.error(`Failed to open profile ${profileName}: ${err.message}`);

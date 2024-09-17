@@ -72,20 +72,33 @@ function getProfilesData(): ProfilesData {
 
 // Função para navegar para uma URL de maneira segura
 async function safeGoto(page: Page, url: string): Promise<void> {
-    if (!page.isClosed()) {
-        try {
-            await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
-        } catch (error: any) {
-            if (error.message.includes('Frame was detached')) {
-                console.warn('Frame was detached during navigation, retrying...');
+    
+    try {
+        if (!page.isClosed() && page.url() !== url) {
+            return
+        }
+    } catch (error) {
+        return
+    }
+
+    if (page.isClosed()) {
+        console.warn('Page is already closed, cannot navigate.');
+        return;
+    }
+    try {
+        await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
+    } catch (error: any) {
+        if (error.message.includes('Frame was detached')) {
+            console.warn('Frame was detached during navigation, retrying...');
+            if (!page.isClosed()) {
                 await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
             } else {
-                console.error('Error navigating:', error.message);
-                throw error; // Rethrow other errors
+                console.warn('Page is closed after frame detachment, cannot retry navigation.');
             }
+        } else {
+            console.error('Error navigating:', error.message);
+            throw error; // Rethrow other errors
         }
-    } else {
-        console.warn('Page is already closed, cannot navigate.');
     }
 }
 
@@ -127,11 +140,11 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
     });
 
     const monitorPages = async () => {
-        const injectedPages = new Set(); // Manter um conjunto de páginas já injetadas
-    
+        const injectedPages = new Set();
+
         while (true) {
             const pages = await browser.pages();
-            // Verifica se não há páginas abertas e fecha o navegador
+    
             if (pages.length === 0) {
                 console.log(`Nenhuma página aberta no perfil ${profileName}. Fechando navegador...`);
                 await browser.close();
@@ -139,28 +152,13 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
                 break;
             }
     
-            // Percorre todas as páginas abertas e injeta o script nas que ainda não foram injetadas
             for (const page of pages) {
                 if (!injectedPages.has(page)) {
-                    try {
-                        // Verifica se a página está carregada
-                        const isPageLoaded = await page.evaluate(() => document.readyState === 'complete');
-                        if (isPageLoaded) {
-                            await setupPage(page, profileName); // Configuração da página antes de injetar o script
-                            await page.setBypassCSP(true); // Ignora CSP para permitir a injeção
-                            await injectScript(page); // Função de injeção do script
-                            injectedPages.add(page); // Marca a página como injetada
-                            
-                            await setupPage(page, profileName); // Configuração da página antes de injetar o scrip
-                        } else {
-                            console.log(`Página ainda não está completamente carregada, tentando novamente mais tarde.`);
-                        }
-                    } catch (error: any) {
-                        console.error(`Erro ao configurar ou injetar o script: ${error.message}`);
-                    }
+                    injectedPages.add(page);
+                    await setupPage(page, profileName);
                 }
             }
-            // Espera 3 segundos antes de verificar novamente
+    
             await new Promise(resolve => setTimeout(resolve, 500));
         }
     };
@@ -168,6 +166,13 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
     let [page] = await browser.pages();
     if (!page) {
         page = await browser.newPage();
+    }
+
+    if (profileInfo.proxy && profileInfo.proxy.enabled) {
+        await page.authenticate({
+            username: profileInfo.proxy.user,
+            password: profileInfo.proxy.passw,
+        });
     }
 
     try {
@@ -180,20 +185,6 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
         }
     }
 
-    if (profileInfo.proxy && profileInfo.proxy.enabled) {
-        await page.authenticate({
-            username: profileInfo.proxy.user,
-            password: profileInfo.proxy.passw,
-        });
-    }
-
-    try {
-        await safeGoto(page, config.defaultPageUrl);
-        await page.reload({ waitUntil: 'networkidle0' });
-    } catch (error) {
-        //console.error('Error navigating to default page:', error);
-    }
-
     // Iniciar monitoramento de páginas
     monitorPages();
     const instance = { browser, page };
@@ -203,14 +194,14 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
 
 // Setup page settings and script injection
 async function setupPage(page: Page, profileName: string): Promise<void> {
-    try {
+        try {
         await page.setBypassCSP(true);
         const injectScripts = async () => {
             try {
-                const ip = '127.0.0.1'; // Pode ser variável
-                const port = 9514; // Pode ser variável
+                const ip = '127.0.0.1';
+                const port = 9514;
                 const identifier = profileName;
-                const delay = 1; // Pode ser variável
+                const delay = 1;
                 const script = `
                     if (!window.WSACTION) {
                         window.WSACTION = { config: {} };
@@ -222,29 +213,28 @@ async function setupPage(page: Page, profileName: string): Promise<void> {
                         delay: ${delay}
                     };
                 `;
-                await scriptInjector.injectScriptFromString(page, script);
+                await page.evaluateOnNewDocument(script);
                 await injectScript(page);
             } catch (error) {
                 console.error('Error during script injection:', error);
             }
         };
 
-        // Inject script once the page is fully loaded
+        // Event listeners
         page.once('load', async () => {
             await injectScripts();
         });
 
-        // Inject script once the DOM content is fully loaded
         page.once('domcontentloaded', async () => {
             await injectScripts();
         });
 
-        // Reinject scripts when the main frame navigates
         page.on('framenavigated', async (frame) => {
             if (frame === page.mainFrame()) {
                 await injectScripts();
             }
         });
+
         await injectScripts();
     } catch (error) {
         console.error('Erro durante a configuração da página:', error);
@@ -428,22 +418,33 @@ function addExtensionToGroup(groupName: string, extension: string): void {
 
 // Launch profiles by name
 async function launchProfilesByName(name: string): Promise<ChromeInstance[]> {
-    const instances:ChromeInstance[] = []
-    var extensions = [...new Set([...getProfilesData().defaultExtensions, ...getProfileInfo(name)?.extensions ?? []])];
+    const instances: ChromeInstance[] = [];
+    const extensions = [...new Set([...getProfilesData().defaultExtensions, ...getProfileInfo(name)?.extensions ?? []])];
     const profiles = listProfilesInfo();
-    const profileNames = profiles.filter(profile => profile.name === name).map(profile => profile.folder_name);
+
+    // Criar uma regex para correspondência de nome (case-insensitive)
+    const nameRegex = new RegExp(name, 'i'); // 'i' para ignorar diferença de maiúsculas e minúsculas
+
+    // Filtrar os perfis que correspondem ao padrão do nome fornecido usando a regex
+    let profileNames = profiles
+        .filter(profile => nameRegex.test(profile.name)) // Usar regex para filtrar os nomes dos perfis
+        .map(profile => profile.folder_name);
+
     if (profileNames.length === 0) {
-        // Profile does not exist, create it
+        // Se não há correspondência, criar um novo perfil
         createProfile(name);
         profileNames.push(name);
     }
+
+    // Para cada perfil correspondente, lançar uma instância do Chrome
     for (const profileName of profileNames) {
-        const prof = getProfileInfo(profileName)
-        if(prof){
+        const prof = getProfileInfo(profileName);
+        if (prof) {
             instances.push(await launchChrome(profileName, extensions, prof));
         }
     }
-    return instances
+
+    return instances;
 }
 
 // Add default extensions
