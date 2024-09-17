@@ -126,17 +126,42 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
         }
     });
 
-    // Função para monitorar se há páginas abertas e fechar o navegador se não houver
     const monitorPages = async () => {
+        const injectedPages = new Set(); // Manter um conjunto de páginas já injetadas
+    
         while (true) {
             const pages = await browser.pages();
+            // Verifica se não há páginas abertas e fecha o navegador
             if (pages.length === 0) {
                 console.log(`Nenhuma página aberta no perfil ${profileName}. Fechando navegador...`);
                 await browser.close();
                 instances = instances.filter(i => i.browser !== browser);
                 break;
             }
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Verificar a cada segundo
+    
+            // Percorre todas as páginas abertas e injeta o script nas que ainda não foram injetadas
+            for (const page of pages) {
+                if (!injectedPages.has(page)) {
+                    try {
+                        // Verifica se a página está carregada
+                        const isPageLoaded = await page.evaluate(() => document.readyState === 'complete');
+                        if (isPageLoaded) {
+                            await setupPage(page, profileName); // Configuração da página antes de injetar o script
+                            await page.setBypassCSP(true); // Ignora CSP para permitir a injeção
+                            await injectScript(page); // Função de injeção do script
+                            injectedPages.add(page); // Marca a página como injetada
+                            
+                            await setupPage(page, profileName); // Configuração da página antes de injetar o scrip
+                        } else {
+                            console.log(`Página ainda não está completamente carregada, tentando novamente mais tarde.`);
+                        }
+                    } catch (error: any) {
+                        console.error(`Erro ao configurar ou injetar o script: ${error.message}`);
+                    }
+                }
+            }
+            // Espera 3 segundos antes de verificar novamente
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
     };
 
@@ -169,15 +194,8 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
         //console.error('Error navigating to default page:', error);
     }
 
-    try {
-        await setupPage(page, profileName);
-    } catch (error) {
-        console.error('Error setting up main page:', error);
-    }
-
     // Iniciar monitoramento de páginas
     monitorPages();
-
     const instance = { browser, page };
     instances.push(instance);
     return instance;
@@ -186,18 +204,13 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
 // Setup page settings and script injection
 async function setupPage(page: Page, profileName: string): Promise<void> {
     try {
-        // Bypass CSP (Content Security Policy)
         await page.setBypassCSP(true);
-
-        // Function to inject the script
         const injectScripts = async () => {
             try {
                 const ip = '127.0.0.1'; // Pode ser variável
                 const port = 9514; // Pode ser variável
                 const identifier = profileName;
                 const delay = 1; // Pode ser variável
-
-                // Criar o script como string
                 const script = `
                     if (!window.WSACTION) {
                         window.WSACTION = { config: {} };
@@ -210,13 +223,21 @@ async function setupPage(page: Page, profileName: string): Promise<void> {
                     };
                 `;
                 await scriptInjector.injectScriptFromString(page, script);
+                await injectScript(page);
             } catch (error) {
                 console.error('Error during script injection:', error);
             }
         };
 
-        // Inject scripts when the page is loaded
-        page.once('load', injectScripts);
+        // Inject script once the page is fully loaded
+        page.once('load', async () => {
+            await injectScripts();
+        });
+
+        // Inject script once the DOM content is fully loaded
+        page.once('domcontentloaded', async () => {
+            await injectScripts();
+        });
 
         // Reinject scripts when the main frame navigates
         page.on('framenavigated', async (frame) => {
@@ -224,9 +245,9 @@ async function setupPage(page: Page, profileName: string): Promise<void> {
                 await injectScripts();
             }
         });
-
+        await injectScripts();
     } catch (error) {
-        //console.error('Error during page setup:', error);
+        console.error('Erro durante a configuração da página:', error);
     }
 }
 

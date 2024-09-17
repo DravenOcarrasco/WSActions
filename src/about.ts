@@ -1,5 +1,5 @@
 const ABOUT = {
-    VERSION: "2.2.8-ALPHA",
+    VERSION: "2.2.9-ALPHA",
     GIT: "https://github.com/DravenOcarrasco/WSActions"
 }
 export default ABOUT;
