@@ -338,7 +338,19 @@
             FRAMEWORK_NAME = detectFramework(); // Detecta o framework uma única vez
             __VERIFIED = true;
         }
-    
+        
+        const dispatchKeyboardEvent = (eventType, key, inputElement) => {
+            const event = new KeyboardEvent(eventType, {
+                bubbles: true,
+                cancelable: true,
+                key: key,
+                charCode: key.charCodeAt(0),
+                keyCode: key.charCodeAt(0),
+                which: key.charCodeAt(0)
+            });
+            inputElement.dispatchEvent(event);
+        };
+
         input.focus();
         console.log(`NAME: ${FRAMEWORK_NAME}`);
         switch (FRAMEWORK_NAME) {
@@ -348,8 +360,36 @@
                 break;
     
             case "Next.js":
-                const nextValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                nextValueSetter.call(input, value);
+                // Obtém o setter nativo do valor para manipulação direta no React
+                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            
+                // Simula digitação de cada caractere
+                for (let i = 0; i < value.length; i++) {
+                    const char = value[i];
+                    
+                    // Dispara eventos de teclado simulando a digitação
+                    dispatchKeyboardEvent('keydown', char, input);
+                    dispatchKeyboardEvent('keypress', char, input);
+            
+                    // Atualiza o valor progressivamente usando o setter nativo do React
+                    nativeInputValueSetter.call(input, value.slice(0, i + 1));
+            
+                    
+            
+                    // Finaliza o ciclo da tecla
+                    dispatchKeyboardEvent('keyup', char, input);
+                }
+
+                // Dispara o evento de input para refletir as mudanças no React/Next.js
+                const inputEvent = new Event('input', 
+                    { 
+                        bubbles: true, 
+                        detail: {
+                            ignore: true
+                        } 
+                    }
+                );
+                input.dispatchEvent(inputEvent);
                 break;
     
             case "Gatsby":
@@ -366,14 +406,13 @@
             default:
                 input.setAttribute('data-programmatically-changed', 'true');
                 input.value = value;
-                const nativeInputEvent = new CustomEvent('input', {
+                input.dispatchEvent(new CustomEvent('input', {
                     bubbles: true,
                     cancelable: true,
                     detail: {
                         ignore: true
                     }
-                });
-                input.dispatchEvent(nativeInputEvent);
+                }));
                 input.removeAttribute('data-programmatically-changed');
                 break;
         }
