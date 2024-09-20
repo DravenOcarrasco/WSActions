@@ -4,15 +4,15 @@ const path = require('path');
 /**
  * Módulo da extensão.
  * 
- * @param {Object} WSIO - Instância do WebSocket IO.
- * @param {Object} APP - Instância do Express.
- * @param {Object} RL - Instância do Readline.
+ * @param {import('socket.io').Server} WSIO - Instância do WebSocket IO.
+ * @param {import('express').Application} APP - Instância do Express.
+ * @param {import('readline').Interface} RL - Instância do Readline.
  * @param {Object} STORAGE - Objeto de armazenamento compartilhado.
- * @param {Object} STORAGE.data - Objeto de armazenamento.
- * @param {Function} STORAGE.save - Função para salvar o armazenamento.
- * @param {Object} EXPRESS - Classe Express.
+ * @param {Object} STORAGE.data - Objeto que contém os dados de armazenamento.
+ * @param {Function} STORAGE.save - Função que salva o armazenamento.
+ * @param {typeof import('express')} EXPRESS - Classe Express.
  * 
- * @returns {Object} - Objeto da extensão.
+ * @returns {{ start: Function, stop: Function }} - Objeto da extensão com funções `start` e `stop`.
  */
 module.exports = (WSIO, APP, RL, STORAGE, EXPRESS) => {
     // Cria um novo roteador para a extensão
@@ -53,7 +53,7 @@ module.exports = (WSIO, APP, RL, STORAGE, EXPRESS) => {
                     WSIO.emit(`${NAME}:command`, { command: 'setMaxDelay', data: maxDelay });
                 });
             }
-        }
+        },
     }
     /**
      * Função de inicialização da extensão.

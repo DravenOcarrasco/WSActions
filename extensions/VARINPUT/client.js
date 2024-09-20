@@ -1,7 +1,6 @@
 (async function () {
     /**
      * Function to create the context for the module.
-     * @returns {Promise<object>} - The context object containing module details and methods.
      */
     async function MakeContext() {
         const MODULE_NAME = "VARINPUT";
@@ -269,9 +268,6 @@
     }
 
     const context = await MakeContext();
-
-    // Set to keep track of inputs that have the event listener
-    const inputsWithListener = new Set();
     
     function detectFramework() {
         // Verifica variáveis globais específicas dos frameworks

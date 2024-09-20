@@ -15,7 +15,10 @@ import { hideBin } from 'yargs/helpers';
 import indexExample from './examples/index';
 import clientExample from './examples/client';
 import iconExample from './examples/icon';
+import metaExample from './examples/metadata'
+
 import prompts from 'prompts';
+import ABOUT from './about';
 
 const IoPort = 9532;
 // Função para criar um atalho usando PowerShell
@@ -106,10 +109,17 @@ async function createExtension(name: string) {
     const indexFileContent = indexExample(name);
     const clientFileContent = clientExample(name);
     const iconExampleB64 = iconExample();
+    const metadExample = metaExample({
+        name,
+        minVersion: ABOUT.VERSION,
+        github: "https://github.com/myextension",
+        compatibility: [`${ABOUT.VERSION}`]
+    });
 
     fs.writeFileSync(path.join(extensionDir, 'index.js'), indexFileContent.trim());
     fs.writeFileSync(path.join(extensionDir, 'client.js'), clientFileContent.trim());
-
+    fs.writeFileSync(path.join(extensionDir, 'meta.json'), JSON.stringify(metadExample, null, 4));
+    
     // Converte o Base64 para buffer e salva como um arquivo PNG
     const iconBuffer = Buffer.from(iconExampleB64, 'base64');
     fs.writeFileSync(path.join(extensionDir, 'icon.png'), iconBuffer);

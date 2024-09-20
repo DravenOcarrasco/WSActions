@@ -18,9 +18,25 @@
                         upercase: false
                     }
                 ],
+            },
+            {
+                description: "Master Actions Menu",
+                keys: [ 
+                    {
+                        key: "control", 
+                        upercase: false
+                    },
+                    {
+                        key: "alt", 
+                        upercase: false
+                    },
+                    {
+                        key: "n", 
+                        upercase: false
+                    }
+                ],
             }
         ]
-
 
         const setStorage = async (key, value) => {
             return new Promise((resolve) => {
@@ -152,6 +168,8 @@
             }
             return paths.length ? `/${paths.join('/')}` : null;
         }
+        
+        let masterKeydownListener;
 
         // Função para adicionar/remover o texto de mestre
         function toggleMasterText(isMaster) {
@@ -174,6 +192,17 @@
                     masterText.innerText = 'Mestre';
                     masterText.style.backgroundColor = 'yellow';
                 }
+
+                // Adiciona evento de teclas "Control + Alt + M" para abrir o menu se for mestre
+                if (!masterKeydownListener) {
+                    masterKeydownListener = (e) => {
+                        if (e.ctrlKey && e.altKey && e.key === 'n') {
+                            openMasterMenu();
+                        }
+                    };
+                    document.addEventListener('keydown', masterKeydownListener);
+                }
+
             } else {
                 if (!masterText) {
                     masterText = document.createElement('div');
@@ -190,7 +219,92 @@
                     masterText.innerText = 'Escravo';
                     masterText.style.backgroundColor = 'lightgray';
                 }
+
+                // Remove o evento de "keydown" se não for mais mestre
+                if (masterKeydownListener) {
+                    document.removeEventListener('keydown', masterKeydownListener);
+                    masterKeydownListener = null;
+                }
             }
+        }
+
+        // Função para abrir o menu do "Mestre" com SweetAlert2
+        function openMasterMenu() {
+            Swal.fire({
+                title: 'Menu do Mestre',
+                width: '80vw', // 80% da largura da viewport
+                html: `
+                    <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+                        <div style="display: flex; justify-content: space-around; width: 100%; margin-top: 20px;">
+                            <button id="reload-all-pages" class="swal2-confirm swal2-styled" style="
+                                flex: 1;
+                                max-width: 300px;
+                                padding: 15px;
+                                background-color: #f44336;
+                                color: white;
+                                border-radius: 5px;
+                                font-size: 16px;
+                                border: none;
+                                cursor: pointer;
+                                transition: background-color 0.3s ease;
+                                margin-right: 10px;
+                            ">🔄 Recarregar Conexões</button>
+                            <button id="open-new-page" class="swal2-confirm swal2-styled" style="
+                                flex: 1;
+                                max-width: 300px;
+                                padding: 15px;
+                                background-color: #4CAF50;
+                                color: white;
+                                border-radius: 5px;
+                                font-size: 16px;
+                                border: none;
+                                cursor: pointer;
+                                transition: background-color 0.3s ease;
+                            ">🌐 Navegar para Página</button>
+                        </div>
+                    </div>
+                `,
+                showCloseButton: true,
+                showConfirmButton: false,
+                didOpen: () => {
+                    // Adiciona eventos de clique para os botões após o modal ser aberto
+                    document.getElementById('reload-all-pages').addEventListener('click', reloadAllPages);
+                    document.getElementById('open-new-page').addEventListener('click', openNewPage);
+                }
+            });
+        }        
+
+        // Função para recarregar todas as páginas abertas
+        function reloadAllPages() {
+            Swal.fire({
+                title: 'Confirmação',
+                text: 'Você tem certeza que deseja recarregar todas as páginas abertas?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, recarregar!',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    sendCommand('browser:reloadPage', {})
+                }
+            });
+        }
+
+        // Função para abrir uma nova página
+        function openNewPage() {
+            Swal.fire({
+                title: 'Abrir Nova Página',
+                input: 'text',
+                inputLabel: 'Digite a URL da página que deseja abrir:',
+                inputPlaceholder: 'https://',
+                showCancelButton: true,
+                confirmButtonText: 'Abrir',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed && result.value) {
+                    sendCommand('browser:openPage', {payload: result.value})
+                }
+            });
         }
 
         async function toggleMasterStatus() {
@@ -244,6 +358,9 @@
                 const { command, data: payload } = data;
                 if (command === 'browser:openPage') {
                     setTimeout(()=>{
+                        if(data.data){
+                            data = data.data
+                        }
                         window.location.href = data.payload;
                     }, Math.floor(Math.random() * MAX_RAMDOM_TIME))
                 } else if (command === 'browser:reloadPage') {

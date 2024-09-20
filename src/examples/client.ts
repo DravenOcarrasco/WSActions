@@ -8,7 +8,7 @@ export default function mount(name: string) {
 (async function () {
     /**
      * Function to create the context for the module.
-     * @returns {Promise<object>} - The context object containing module details and methods.
+     * This context includes WebSocket connection, keyboard commands, storage management, and utility functions.
      */
     async function MakeContext() {
         const MODULE_NAME = "${name.toUpperCase()}";
