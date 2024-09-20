@@ -1,7 +1,9 @@
 import ChromeManager from './chromeManager';
 import { loadConfig } from './config';
+
 const config = loadConfig();
 ChromeManager.initializeChromeManager(config.chromeProfilePath);
+
 import path from 'path';
 import fs from 'fs';
 import { exec } from 'child_process';
@@ -12,6 +14,7 @@ import { hideBin } from 'yargs/helpers';
 
 import indexExample from './examples/index';
 import clientExample from './examples/client';
+import iconExample from './examples/icon';
 import prompts from 'prompts';
 
 const IoPort = 9532;
@@ -102,10 +105,15 @@ async function createExtension(name: string) {
 
     const indexFileContent = indexExample(name);
     const clientFileContent = clientExample(name);
+    const iconExampleB64 = iconExample();
 
     fs.writeFileSync(path.join(extensionDir, 'index.js'), indexFileContent.trim());
     fs.writeFileSync(path.join(extensionDir, 'client.js'), clientFileContent.trim());
 
+    // Converte o Base64 para buffer e salva como um arquivo PNG
+    const iconBuffer = Buffer.from(iconExampleB64, 'base64');
+    fs.writeFileSync(path.join(extensionDir, 'icon.png'), iconBuffer);
+    
     console.log(`Extensão ${name} criada com sucesso em ${extensionDir}.`);
 }
 

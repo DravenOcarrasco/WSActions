@@ -12,7 +12,7 @@ export default function mount(name: string) {
      */
     async function MakeContext() {
         const MODULE_NAME = "${name.toUpperCase()}";
-        const SOCKET = io(\`\${window.WSACTION.config.ip}:\${window.WSACTION.config.port}\`, { secure: false });
+        const SOCKET = io(\`http://\${window.WSACTION.config.ip}:\${window.WSACTION.config.port}\`, { secure: false });
 
         const KEYBOARD_COMMANDS = [
             {
