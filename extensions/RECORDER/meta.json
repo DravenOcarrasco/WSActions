@@ -1,0 +1,9 @@
+{
+    "name": "RECORDER",
+    "version": "1.0.0",
+    "github": "https://github.com/DravenOcarrasco/RECORDER.git",
+    "minVersion": "2.4.0-ALPHA",
+    "compatibility": [
+        "2.4.0-ALPHA"
+    ]
+}

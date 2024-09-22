@@ -1,0 +1,9 @@
+{
+    "name": "TOOLS",
+    "version": "1.0.0",
+    "github": "https://github.com/DravenOcarrasco/TOOLS.git",
+    "minVersion": "2.4.0-ALPHA",
+    "compatibility": [
+        "2.4.0-ALPHA"
+    ]
+}
