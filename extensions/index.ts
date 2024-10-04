@@ -2,7 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import express, { Application, Router } from 'express';
 import { Server as SocketIoServer, Socket } from 'socket.io';
+import os from 'os'
 import readline from 'readline';
+import { tempExtensionDir } from '../src/utils/config';
 
 // Definir o diretório de execução
 const execPath = process.execPath;
@@ -12,6 +14,12 @@ const execDir = execPath.includes("bun.exe") || execPath.includes("node.exe")
 
 const extensionsPath = path.resolve(process.cwd(), 'extensions');
 const storagePath = path.resolve(process.cwd(), 'storage.json'); // Path for storage file
+
+// Verificar se a pasta existe, se não, criar a pasta
+if (!fs.existsSync(tempExtensionDir)) {
+    fs.mkdirSync(tempExtensionDir, { recursive: true });
+} else {}
+
 
 interface Extension {
     NAME: string;
@@ -56,12 +64,12 @@ const ModuleController = (() => {
 
     // Cria um objeto proxy para monitorar mudanças e salvar o armazenamento
     const STORAGE = new Proxy({}, {
-        set(target:any, key:any, value) {
+        set(target: any, key: any, value) {
             target[key] = value;
             saveStorage();
             return true;
         },
-        deleteProperty(target:any, key:any) {
+        deleteProperty(target: any, key: any) {
             delete target[key];
             saveStorage();
             return true;
@@ -109,93 +117,170 @@ const ModuleController = (() => {
      * Para cada extensão, inicializa, registra eventos IO e adiciona rotas Express.
      */
     const loadExtensions = () => {
-        // Verificar se o diretório EXTENSIONS existe
-        if (!fs.existsSync(extensionsPath)) {
-            console.error(`Diretório não encontrado: ${extensionsPath}`);
-            return;
+        if (fs.existsSync(extensionsPath)) {
+            fs.readdirSync(extensionsPath).forEach(extensionDir => {
+                const extensionPath = path.join(extensionsPath, extensionDir);
+                if (fs.statSync(extensionPath).isDirectory()) {
+                    const extensionModule = require(extensionPath);
+                    if (typeof extensionModule === 'function') {
+                        let EXT: Extension = {} as Extension;
+                        try {
+                            EXT = extensionModule(WSIO, APP, RL, { data: STORAGE, save: saveStorage }, express);
+                            console.log(`Extensão carregada: ${EXT.NAME}`);
+
+                            if (EXT.ENABLED) {
+                                EXT.onInitialize();
+                                EXTENSIONS.ENABLED.push(EXT);
+                                // Criar registro no armazenamento para a extensão
+                                if (!STORAGE[EXT.NAME]) {
+                                    STORAGE[EXT.NAME] = {};
+                                }
+                                if (EXT.COMMANDS) {
+                                    for (const [event, handler] of Object.entries(EXT.COMMANDS)) {
+                                        WSIO?.on(`${EXT.NAME}.${event}`, handler._function);
+                                        if (!COMMANDS.CLI[EXT.NAME]) {
+                                            COMMANDS.CLI[EXT.NAME] = {};
+                                        }
+                                        COMMANDS.CLI[EXT.NAME][event] = handler;
+                                    }
+                                }
+                                if (EXT.IOEVENTS) {
+                                    for (const [event, handler] of Object.entries(EXT.IOEVENTS)) {
+                                        if (!COMMANDS.IO[EXT.NAME]) {
+                                            COMMANDS.IO[EXT.NAME] = {};
+                                        }
+                                        COMMANDS.IO[EXT.NAME][event] = handler;
+                                    }
+                                }
+                            } else {
+                                EXTENSIONS.DISABLED.push(EXT);
+                            }
+                            // Define a rota para retornar o arquivo client.js
+                            APP?.get(`/ext/${EXT.NAME}/client`, (req, res) => {
+                                const filePath = path.resolve(process.cwd(), 'extensions', EXT.NAME, './client.js'); // Ajuste o caminho conforme necessário
+                                res.sendFile(filePath, (err) => {
+                                    if (err) {
+                                        res.status(500).send(`${filePath} not found`);
+                                    }
+                                });
+                            });
+
+                            APP?.get(`/ext/${EXT.NAME}/icon`, (req, res) => {
+                                const filePath = path.resolve(process.cwd(), 'extensions', EXT.NAME, 'icon.png'); // Ajuste o caminho conforme necessário
+                                fs.readFile(filePath, (err, data) => {
+                                    if (err) {
+                                        res.status(500).send(`${filePath} not found`);
+                                    } else {
+                                        const base64Image = Buffer.from(data).toString('base64');
+                                        res.send(`data:image/png;base64,${base64Image}`);
+                                    }
+                                });
+                                // const filePath = path.resolve(process.cwd(), 'extensions', EXT.NAME, './icon.png'); // Ajuste o caminho conforme necessário
+                                // res.sendFile(filePath, (err) => {
+                                //     if (err) {
+                                //         res.status(500).send(`${filePath} not found`);
+                                //     }
+                                // });
+                            });
+
+                            APP?.use(`/ext/${EXT.NAME}`, EXT.ROUTER);
+                        } catch (error) {
+                            console.error(error);
+                            EXT.ENABLED = false;
+                            EXTENSIONS.DISABLED.push(EXT);
+                            if (EXT.onError) {
+                                EXT.onError(error);
+                            }
+                        }
+                    } else {
+                        console.error(`Extensão inválida: ${extensionDir}`);
+                    }
+                }
+            });
         }
 
-        // Carregar todas as extensões dinamicamente
-        fs.readdirSync(extensionsPath).forEach(extensionDir => {
-            const extensionPath = path.join(extensionsPath, extensionDir);
-            if (fs.statSync(extensionPath).isDirectory()) {
-                const extensionModule = require(extensionPath);
-                if (typeof extensionModule === 'function') {
-                    let EXT: Extension = {} as Extension;
-                    try {
-                        EXT = extensionModule(WSIO, APP, RL, { data: STORAGE, save: saveStorage }, express);
-                        console.log(`Extensão carregada: ${EXT.NAME}`);
+        if (fs.existsSync(tempExtensionDir)) {
+            fs.readdirSync(tempExtensionDir).forEach(extensionDir => {
+                const extensionPath = path.join(tempExtensionDir, extensionDir);
+                if (fs.statSync(extensionPath).isDirectory()) {
+                    const extensionModule = require(extensionPath);
+                    if (typeof extensionModule === 'function') {
+                        let EXT: Extension = {} as Extension;
+                        try {
+                            EXT = extensionModule(WSIO, APP, RL, { data: STORAGE, save: saveStorage }, express);
+                            console.log(`Extensão carregada: ${EXT.NAME}`);
 
-                        if (EXT.ENABLED) {
-                            EXT.onInitialize();
-                            EXTENSIONS.ENABLED.push(EXT);
-                            // Criar registro no armazenamento para a extensão
-                            if (!STORAGE[EXT.NAME]) {
-                                STORAGE[EXT.NAME] = {};
-                            }
-                            if (EXT.COMMANDS) {
-                                for (const [event, handler] of Object.entries(EXT.COMMANDS)) {
-                                    WSIO?.on(`${EXT.NAME}.${event}`, handler._function);
-                                    if (!COMMANDS.CLI[EXT.NAME]) {
-                                        COMMANDS.CLI[EXT.NAME] = {};
-                                    }
-                                    COMMANDS.CLI[EXT.NAME][event] = handler;
+                            if (EXT.ENABLED) {
+                                EXT.onInitialize();
+                                EXTENSIONS.ENABLED.push(EXT);
+                                // Criar registro no armazenamento para a extensão
+                                if (!STORAGE[EXT.NAME]) {
+                                    STORAGE[EXT.NAME] = {};
                                 }
-                            }
-                            if (EXT.IOEVENTS) {
-                                for (const [event, handler] of Object.entries(EXT.IOEVENTS)) {
-                                    if (!COMMANDS.IO[EXT.NAME]) {
-                                        COMMANDS.IO[EXT.NAME] = {};
+                                if (EXT.COMMANDS) {
+                                    for (const [event, handler] of Object.entries(EXT.COMMANDS)) {
+                                        WSIO?.on(`${EXT.NAME}.${event}`, handler._function);
+                                        if (!COMMANDS.CLI[EXT.NAME]) {
+                                            COMMANDS.CLI[EXT.NAME] = {};
+                                        }
+                                        COMMANDS.CLI[EXT.NAME][event] = handler;
                                     }
-                                    COMMANDS.IO[EXT.NAME][event] = handler;
                                 }
+                                if (EXT.IOEVENTS) {
+                                    for (const [event, handler] of Object.entries(EXT.IOEVENTS)) {
+                                        if (!COMMANDS.IO[EXT.NAME]) {
+                                            COMMANDS.IO[EXT.NAME] = {};
+                                        }
+                                        COMMANDS.IO[EXT.NAME][event] = handler;
+                                    }
+                                }
+                            } else {
+                                EXTENSIONS.DISABLED.push(EXT);
                             }
-                        } else {
+                            // Define a rota para retornar o arquivo client.js
+                            APP?.get(`/ext/${EXT.NAME}/client`, (req, res) => {
+                                const filePath = path.resolve(process.cwd(), 'extensions', EXT.NAME, './client.js'); // Ajuste o caminho conforme necessário
+                                res.sendFile(filePath, (err) => {
+                                    if (err) {
+                                        res.status(500).send(`${filePath} not found`);
+                                    }
+                                });
+                            });
+
+                            APP?.get(`/ext/${EXT.NAME}/icon`, (req, res) => {
+                                const filePath = path.resolve(process.cwd(), 'extensions', EXT.NAME, 'icon.png'); // Ajuste o caminho conforme necessário
+                                fs.readFile(filePath, (err, data) => {
+                                    if (err) {
+                                        res.status(500).send(`${filePath} not found`);
+                                    } else {
+                                        const base64Image = Buffer.from(data).toString('base64');
+                                        res.send(`data:image/png;base64,${base64Image}`);
+                                    }
+                                });
+                                // const filePath = path.resolve(process.cwd(), 'extensions', EXT.NAME, './icon.png'); // Ajuste o caminho conforme necessário
+                                // res.sendFile(filePath, (err) => {
+                                //     if (err) {
+                                //         res.status(500).send(`${filePath} not found`);
+                                //     }
+                                // });
+                            });
+
+                            APP?.use(`/ext/${EXT.NAME}`, EXT.ROUTER);
+                        } catch (error) {
+                            console.error(error);
+                            EXT.ENABLED = false;
                             EXTENSIONS.DISABLED.push(EXT);
+                            if (EXT.onError) {
+                                EXT.onError(error);
+                            }
                         }
-                        // Define a rota para retornar o arquivo client.js
-                        APP?.get(`/ext/${EXT.NAME}/client`, (req, res) => {
-                            const filePath = path.resolve(process.cwd(), 'extensions', EXT.NAME, './client.js'); // Ajuste o caminho conforme necessário
-                            res.sendFile(filePath, (err) => {
-                                if (err) {
-                                    res.status(500).send(`${filePath} not found`);
-                                }
-                            });
-                        });
-
-                        APP?.get(`/ext/${EXT.NAME}/icon`, (req, res) => {
-                            const filePath = path.resolve(process.cwd(), 'extensions', EXT.NAME, 'icon.png'); // Ajuste o caminho conforme necessário
-                            fs.readFile(filePath, (err, data) => {
-                                if (err) {
-                                    res.status(500).send(`${filePath} not found`);
-                                } else {
-                                    const base64Image = Buffer.from(data).toString('base64');
-                                    res.send(`data:image/png;base64,${base64Image}`);
-                                }
-                            });
-                            // const filePath = path.resolve(process.cwd(), 'extensions', EXT.NAME, './icon.png'); // Ajuste o caminho conforme necessário
-                            // res.sendFile(filePath, (err) => {
-                            //     if (err) {
-                            //         res.status(500).send(`${filePath} not found`);
-                            //     }
-                            // });
-                        });
-
-                        APP?.use(`/ext/${EXT.NAME}`, EXT.ROUTER);
-                    } catch (error) {
-                        console.error(error);
-                        EXT.ENABLED = false;
-                        EXTENSIONS.DISABLED.push(EXT);
-                        if (EXT.onError) {
-                            EXT.onError(error);
-                        }
+                    } else {
+                        console.error(`Extensão inválida: ${extensionDir}`);
                     }
-                } else {
-                    console.error(`Extensão inválida: ${extensionDir}`);
                 }
-            }
-        });
-
+            });
+        }
+        
         console.log('Extensões habilitadas:', EXTENSIONS.ENABLED.map(ext => ext.NAME));
         console.log('Extensões desabilitadas:', EXTENSIONS.DISABLED.map(ext => ext.NAME));
 

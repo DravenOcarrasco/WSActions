@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ES2021",                     /* Define a versão da linguagem JavaScript para o JavaScript emitido e inclui declarações de biblioteca compatíveis. */
+    "target": "ES2022",                     /* Define a versão da linguagem JavaScript para o JavaScript emitido e inclui declarações de biblioteca compatíveis. */
     "module": "commonjs",                   /* Especifica qual código de módulo é gerado. */
     "outDir": "./tsc-build",                     /* Especifica uma pasta de saída para todos os arquivos emitidos. */
     "esModuleInterop": true,                /* Emite JavaScript adicional para facilitar o suporte à importação de módulos CommonJS. */

@@ -57,8 +57,8 @@ foreach ($file in $filesToCopy) {
 }
 
 # Copia node_modules e package.json para a pasta build
-Copy-Item -Recurse -Path node_modules -Destination build\node_modules
-Write-Host "'node_modules' copied to 'build'."
+# Copy-Item -Recurse -Path node_modules -Destination build\node_modules
+# Write-Host "'node_modules' copied to 'build'."
 
 Copy-Item -Path package.json -Destination build\package.json
 Write-Host "'package.json' copied to 'build'."

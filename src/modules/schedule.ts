@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import logger from './logger';
 import ChromeManager from '../chromeManager';
-import { loadConfig } from '../config'; // Certifique-se de que o caminho está correto
+import { loadConfig } from '../utils/config'; // Certifique-se de que o caminho está correto
 
 const config = loadConfig();
 

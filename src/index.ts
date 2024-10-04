@@ -1,5 +1,5 @@
 import ChromeManager from './chromeManager';
-import { loadConfig } from './config';
+import { loadConfig } from './utils/config';
 
 const config = loadConfig();
 ChromeManager.initializeChromeManager(config.chromeProfilePath);
@@ -7,7 +7,7 @@ ChromeManager.initializeChromeManager(config.chromeProfilePath);
 import path from 'path';
 import fs from 'fs';
 import { exec } from 'child_process';
-import { startWebSocketServer, sendToServer, io } from './cli-websocket';
+import { startWebSocketServer, sendToServer, io } from './modules/cli-websocket';
 
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -19,6 +19,8 @@ import metaExample from './examples/metadata'
 
 import prompts from 'prompts';
 import ABOUT from './about';
+
+import ServerHandler from './ServerHandler';
 
 const IoPort = 9532;
 // Função para criar um atalho usando PowerShell
@@ -93,7 +95,7 @@ function createShortcut(executablePath: string, shortcutName: string, args: stri
     });
 }
 createShortcut(path.resolve(process.execPath), 'Run-Server', 'server')
-createShortcut(path.resolve(process.execPath), 'open-chrome', 'open-chrome')
+createShortcut(path.resolve(process.execPath), 'Open-chrome', 'open-chrome')
 
 // Função para criar uma extensão
 async function createExtension(name: string) {
@@ -431,12 +433,7 @@ yargs(hideBin(process.argv))
         command: "server",
         describe: "inicializa em modo servidor",
         async handler(argv) {
-            let io = await startWebSocketServer();
-            io?.listen(IoPort);
-            const { default: api } = await import('./api');
-            const { scheduleProfiles } = await import('./modules/schedule');
-            scheduleProfiles();
-            const API = api;
+            ServerHandler(IoPort)
         }
     })
     .parse();

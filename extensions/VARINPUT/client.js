@@ -335,20 +335,22 @@
             __VERIFIED = true;
         }
         
-        const dispatchKeyboardEvent = (eventType, key, inputElement) => {
-            const event = new KeyboardEvent(eventType, {
-                bubbles: true,
-                cancelable: true,
-                key: key,
-                charCode: key.charCodeAt(0),
-                keyCode: key.charCodeAt(0),
-                which: key.charCodeAt(0)
-            });
-            inputElement.dispatchEvent(event);
-        };
+        // const dispatchKeyboardEvent = (eventType, key, inputElement) => {
+        //     const event = new KeyboardEvent(eventType, {
+        //         bubbles: true,
+        //         cancelable: true,
+        //         key: key,
+        //         charCode: key.charCodeAt(0),
+        //         keyCode: key.charCodeAt(0),
+        //         which: key.charCodeAt(0),
+        //         detail: {
+        //             ignore: true
+        //         } 
+        //     });
+        //     inputElement.dispatchEvent(event);
+        // };
 
         input.focus();
-        console.log(`NAME: ${FRAMEWORK_NAME}`);
         switch (FRAMEWORK_NAME) {
             case "React":
                 const nativeValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
@@ -356,36 +358,8 @@
                 break;
     
             case "Next.js":
-                // Obtém o setter nativo do valor para manipulação direta no React
                 const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-            
-                // Simula digitação de cada caractere
-                for (let i = 0; i < value.length; i++) {
-                    const char = value[i];
-                    
-                    // Dispara eventos de teclado simulando a digitação
-                    dispatchKeyboardEvent('keydown', char, input);
-                    dispatchKeyboardEvent('keypress', char, input);
-            
-                    // Atualiza o valor progressivamente usando o setter nativo do React
-                    nativeInputValueSetter.call(input, value.slice(0, i + 1));
-            
-                    
-            
-                    // Finaliza o ciclo da tecla
-                    dispatchKeyboardEvent('keyup', char, input);
-                }
-
-                // Dispara o evento de input para refletir as mudanças no React/Next.js
-                const inputEvent = new Event('input', 
-                    { 
-                        bubbles: true, 
-                        detail: {
-                            ignore: true
-                        } 
-                    }
-                );
-                input.dispatchEvent(inputEvent);
+                nativeInputValueSetter.call(input, value);
                 break;
     
             case "Gatsby":
@@ -400,7 +374,6 @@
                 break;
     
             default:
-                input.setAttribute('data-programmatically-changed', 'true');
                 input.value = value;
                 input.dispatchEvent(new CustomEvent('input', {
                     bubbles: true,
@@ -409,9 +382,12 @@
                         ignore: true
                     }
                 }));
-                input.removeAttribute('data-programmatically-changed');
                 break;
         }
+        input.setAttribute('data-programmatically-changed', 'true');
+        setTimeout(()=>{
+            input.removeAttribute('data-programmatically-changed');
+        }, 3000)
     };
 
     // Function to observe changes in the DOM
@@ -426,12 +402,18 @@
                 let match;
                 let newValue = value;
 
-                // Substitui os padrões {{variavel}} pelo valor da variável correspondente
+                let hasMatch = false;
                 while ((match = variablePattern.exec(value)) !== null) {
+                    hasMatch = true;  // Houve um match
                     const variableName = match[1];
                     const variableValue = context.getVariableFromList(variableName, `{{${variableName}}}`);
                     newValue = newValue.replace(`{{${variableName}}}`, variableValue);
                     simulateInput(input, newValue);
+                }
+
+                // Se não houve nenhum match, remova o atributo
+                if (!hasMatch) {
+                    input.removeAttribute('data-programmatically-changed');
                 }
                 // input.value = value;
             }

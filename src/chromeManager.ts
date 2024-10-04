@@ -3,7 +3,7 @@ import { Browser, Page, Frame, Target } from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 import { ScriptInjector } from './scriptInjector';
-import { loadConfig } from './config'; // Importa a função de configuração
+import { loadConfig } from './utils/config'; // Importa a função de configuração
 import { exec } from 'child_process';
 import { ChromeProfileInfo } from './interfaces/ChromeProfileInfo';
 

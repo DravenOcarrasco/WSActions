@@ -1,7 +1,7 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { createServer } from 'http';
 import { io as SocketIOClient, Socket as ClientSocket } from 'socket.io-client';
-import ChromeManager from './chromeManager';
+import ChromeManager from '../chromeManager';
 
 export var io: SocketIOServer | null = null;
 

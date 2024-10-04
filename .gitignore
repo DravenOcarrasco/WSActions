@@ -197,4 +197,6 @@ WSAction_build_with_node_modules
 WSAction_build_with_node_modules.zip
 WSAction_build.zip
 WSActions.exe
+identity.bin
 WSAction_build_*-ALPHA.zip
+WSAction_build_*-BETA.zip

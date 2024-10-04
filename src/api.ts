@@ -5,7 +5,7 @@ import { Server as SocketIoServer, Socket } from 'socket.io';
 import readline from 'readline';
 import cors from 'cors';
 import ModuleController from '../extensions';  // Verifique se o caminho para este módulo está correto
-import { loadConfig } from './config';
+import { loadConfig } from './utils/config';
 import { cwd } from 'process';
 import { readFile } from 'fs/promises';
 
