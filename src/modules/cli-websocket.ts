@@ -1,5 +1,5 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
-import { createServer } from 'http';
+import { createServer, Server as HttpServer } from 'http';
 import { io as SocketIOClient, Socket as ClientSocket } from 'socket.io-client';
 import ChromeManager from '../chromeManager';
 
@@ -64,5 +64,35 @@ export async function sendToServer(port: number, event: string, data: any): Prom
         clientSocket.connect()
     }).catch(error => {
         throw error;
+    });
+}
+
+/**
+ * Função para criar um servidor WebSocket independente usando Socket.IO.
+ * @param {number} port - A porta em que o servidor WebSocket deve ser iniciado.
+ * @returns {Promise<{ io: SocketIOServer, server: HttpServer }>} - Retorna a instância do servidor Socket.IO e do servidor HTTP.
+ */
+export async function createSeparateWebSocketServer(port: number): Promise<{ io: SocketIOServer, server: HttpServer }> {
+    return new Promise((resolve, reject) => {
+        try {
+            // Criar um servidor HTTP separado
+            const httpServer = createServer();
+
+            // Inicializar o Socket.IO usando o servidor HTTP
+            const io: SocketIOServer = new SocketIOServer(httpServer, {
+                cors: {
+                    origin: '*', // Permitindo todas as origens (ideal para desenvolvimento)
+                },
+            });
+
+            // Iniciar o servidor HTTP na porta fornecida
+            httpServer.listen(port, () => {
+                resolve({ io, server: httpServer }); // Retornar a instância do servidor Socket.IO e HTTP
+            });
+
+        } catch (error: any) {
+            console.error(`Erro ao iniciar o servidor WebSocket: ${error.message}`);
+            reject(error); // Rejeitar a Promise em caso de erro
+        }
     });
 }

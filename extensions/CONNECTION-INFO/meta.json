@@ -1,9 +1,0 @@
-{
-    "name": "CONNECTION-INFO",
-    "version": "1.0.0",
-    "github": "https://github.com/DravenOcarrasco/CONNECTION-INFO.git",
-    "minVersion": "2.4.0-ALPHA",
-    "compatibility": [
-        "2.4.0-ALPHA"
-    ]
-}

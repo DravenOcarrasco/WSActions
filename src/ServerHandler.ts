@@ -1,47 +1,34 @@
-import { existsSync, writeFileSync, readFileSync, mkdirSync, createWriteStream, rmSync, readdirSync } from 'fs';
-import path from 'path';
+import { existsSync} from 'fs';
 import express from 'express';
 import { spawn } from 'child_process';
-import { Encripty, generateUniqueKey } from './utils/encrypt';
-import { startWebSocketServer } from './modules/cli-websocket';
-import { loadConfig, tempExtensionDir } from './utils/config';
+import { createSeparateWebSocketServer } from './modules/cli-websocket';
+import { loadConfig } from './utils/config';
 import cors from 'cors';
 import os from 'os';
-import unzipper from 'unzipper';
-import axios from 'axios';
-
-import {createOrLoadIdentityFile, updateIdentityFile} from "./utils/identity"
+import { createOrLoadIdentityFile, updateIdentityFile } from './utils/identity';
 import { prepareExtensions } from './utils/extensionManager';
+import chalk from 'chalk';
+import figlet from 'figlet';
+import ABOUT from './about';
+import path from 'path';
+import extensions from '../extensions'
+
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: '*' }));
 
-
 const config = loadConfig();
 
-const tempDir = path.resolve(os.tmpdir(), 'extensions-download');
-
-const downloadExtension = async (extension: any) => {
-    const fileUrl = `${config.api_endpoint}/${extension.extension.extensionFilePath}`;
-    const filePath = path.resolve(tempDir, `${extension.extension.name}-${extension.extension.version}.zip`);
-    if (!existsSync(tempDir)) {
-        mkdirSync(tempDir, { recursive: true });
-    }
-    const writer = createWriteStream(filePath);
-    try {
-        const response = await axios({
-            url: fileUrl,
-            method: 'GET',
-            responseType: 'stream',
-        });
-        response.data.pipe(writer);
-        return new Promise((resolve, reject) => {
-            writer.on('finish', () => resolve(filePath));
-            writer.on('error', reject);
-        });
-    } catch (error) {
-        console.error('Erro ao fazer o download da extensão:', error);
-    }
+// Função para exibir o cabeçalho em ASCII art
+const showHeader = () => {
+    console.log(
+        chalk.blue(
+            figlet.textSync(`WS ACTION`, {
+                horizontalLayout: 'default',
+                verticalLayout: 'default'
+            })
+        )
+    );
 };
 
 // Função de autenticação baseada no arquivo de identidade
@@ -55,17 +42,16 @@ const authServer = async () => {
 
 // Função para inicializar o servidor após a autenticação
 const serverInit = async (IoPort: number) => {
-    let io = await startWebSocketServer();
-    io?.listen(IoPort);
+    let { io } = await createSeparateWebSocketServer(IoPort);
     const { scheduleProfiles } = await import('./modules/schedule');
     scheduleProfiles();
+
 };
 
 // Função para abrir o Google Chrome com base no sistema operacional
 const openChrome = (url: string) => {
     const platform = os.platform();
     let browserOpened = false;
-
     try {
         if (platform === 'darwin') {
             spawn('open', ['-a', 'Google Chrome', url], { detached: true, stdio: 'ignore' }).unref();
@@ -82,19 +68,58 @@ const openChrome = (url: string) => {
                 spawn(chromePath, [url], { detached: true, stdio: 'ignore' }).unref();
                 browserOpened = true;
             } else {
-                console.error('Google Chrome não encontrado nos locais padrão.');
+                console.log(chalk.red('Google Chrome não encontrado nos locais padrão.'));
             }
         } else if (platform === 'linux') {
             spawn('google-chrome', [url], { detached: true, stdio: 'ignore' }).unref();
         } else {
-            console.error(`Sistema operacional não suportado: ${platform}`);
+            console.log(chalk.red(`Sistema operacional não suportado: ${platform}`));
         }
     } catch (error) {
-        console.error('Erro ao tentar abrir o Google Chrome:', error);
+        console.log(chalk.red('Erro ao tentar abrir o Google Chrome'));
     }
 
     if (!browserOpened) {
-        console.log(`Por favor, abra manualmente o seguinte URL: ${url}`);
+        console.log(chalk.blue(`Por favor, abra manualmente o seguinte URL: ${url}`));
+    }
+};
+
+// Função para reiniciar o processo
+const restartProcess = () => {
+    console.log(chalk.yellow('Tentando reiniciar o processo...'));
+
+    const executableName = path.basename(process.argv[0]); // Nome do executável atual
+    const isWindows = process.platform === 'win32';
+    const isLinux = process.platform === 'linux';
+
+    // Função para iniciar o processo filho e encerrar o pai
+    const startProcess = (command: string, args: string[]) => {
+        const subprocess = spawn(command, args, {
+            cwd: process.cwd(), // O cwd já está definido, então basta o nome do executável
+            detached: true,
+            stdio: 'inherit',
+            shell: true
+        });
+
+        subprocess.on('spawn', () => {
+            console.log(chalk.green('Novo processo iniciado com sucesso. Encerrando o processo pai.'));
+            process.exit(0); // Encerrar o processo pai após iniciar o filho
+        });
+
+        subprocess.on('error', (err) => {
+            console.error(chalk.red('Erro ao reiniciar o processo:'), err);
+            setTimeout(() => startProcess(command, args), 2000); // Tentar novamente após 2 segundos
+        });
+    };
+
+    if (isWindows) {
+        console.log(chalk.blue(`Executando o executável do Windows diretamente...`));
+        startProcess(executableName, ['server']); // Apenas o nome do executável e os parâmetros
+    } else if (isLinux) {
+        console.log(chalk.blue('Executando o executável no Linux...'));
+        startProcess(executableName, ['server']); // Mesmo conceito para Linux
+    } else {
+        console.error(chalk.red('Sistema operacional não suportado.'));
     }
 };
 
@@ -106,20 +131,33 @@ app.post('/register', (req, res) => {
     }
     updateIdentityFile(user_id);
     res.json({ message: 'user_id registrado com sucesso' });
+    console.log(chalk.green(`WSACTION PREPARADO!`));
+
     setTimeout(() => {
-        process.exit(0);
+        restartProcess();  // Reiniciar o processo em vez de fechar
     }, 3000);
+
 });
 
 // Função principal que chama a autenticação e inicializa o servidor se a autenticação for válida
 export default async (IoPort: number) => {
+    showHeader();
+
     const { existUser, user_id } = await authServer();
+
     if (existUser) {
+        console.log(chalk.green('Usuário autenticado com sucesso!'));
+
         await prepareExtensions(user_id as string);
+
         const { default: api } = await import('./api');
         await serverInit(IoPort);
+
     } else {
+        console.log(chalk.red('Nenhum usuário registrado. Por favor, registre-se.'));
+
         app.listen(9513, async () => {
+            console.log(chalk.yellow('Servidor API escutando na porta 9513.'));
             openChrome(`${config.dashboard_endpoint}`);
         });
     }

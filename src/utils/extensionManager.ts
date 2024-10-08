@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync, readFileSync, mkdirSync, createWriteStream, rmSync, readdirSync, createReadStream } from 'fs';
+import { existsSync, readFileSync, mkdirSync, createWriteStream, rmSync, readdirSync, createReadStream } from 'fs';
 import path from 'path';
 import os from 'os';
 import axios from 'axios';
@@ -166,17 +166,20 @@ export const prepareExtensions = async (utoken: string) => {
                     console.log(`Restaurando a extensão ${subscription.extension.name}.`);
                     await restoreZippedExtension(subscription.extension.name, extensionDir);
                 }
+                
+                let permission = true; 
 
                 // Verifica se há uma nova versão disponível
                 if (currentVersion && isVersionNewer(currentVersion, subscription.extension.version)) {
                     if (!config.auto_update_extensions) {
-                        const shouldUpdate = await showUpdateMenu(subscription.extension.name, currentVersion, subscription.extension.version);
-                        if (!shouldUpdate) continue;
+                        permission = await showUpdateMenu(subscription.extension.name, currentVersion, subscription.extension.version);
                     }
                 }
 
-                const zipFilePath = await downloadExtension(subscription);
-                await unzipExtension(zipFilePath, extensionDir);
+                if (!currentVersion && permission){
+                    const zipFilePath = await downloadExtension(subscription);
+                    await unzipExtension(zipFilePath, extensionDir);
+                }
             }
         }
     } catch (error) {

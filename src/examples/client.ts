@@ -7,145 +7,55 @@ export default function mount(name: string) {
     return `
 (async function () {
     /**
-     * Function to create the context for the module.
-     * This context includes WebSocket connection, keyboard commands, storage management, and utility functions.
-     */
-    async function MakeContext() {
-        const MODULE_NAME = "${name.toUpperCase()}";
-        const SOCKET = io(\`http://\${window.WSACTION.config.ip}:\${window.WSACTION.config.port}\`, { secure: false });
-
-        const KEYBOARD_COMMANDS = [
-            {
-                description: "Nothing",
-                keys: [ 
-                    {
-                        key: "control", 
-                        upercase: false
-                    }
-                ]
-            }
-        ]
-
-        /**
-         * Stores a value in the module's storage.
-         * @param {string} key - The storage key.
-         * @param {any} value - The value to be stored.
-         * @returns {Promise<object>} - Result of the storage operation.
-         */
-        const setStorage = async (key, value) => {
-            return new Promise((resolve) => {
-                const timeout = setTimeout(() => {
-                    resolve({ success: false, error: 'Timeout: The operation took more than 10 seconds.' });
-                }, 10000);
-
-                socket.on(\`storage.store.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`, (data) => {
-                    clearTimeout(timeout);
-                    resolve(data);
-                });
-
-                SOCKET.emit('storage.store', {
-                    extension: MODULE_NAME,
-                    id: window.identifier,
-                    key,
-                    value,
-                    response: \`storage.store.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`
-                });
-            });
-        };
-
-        /**
-         * Loads a value from the module's storage.
-         * @param {string} key - The storage key.
-         * @returns {Promise<object>} - Result of the load operation.
-         */
-        const getStorage = async (key) => {
-            return new Promise((resolve) => {
-                const timeout = setTimeout(() => {
-                    resolve({ success: false, error: 'Timeout: The operation took more than 10 seconds.' });
-                }, 10000);
-
-                socket.on(\`storage.load.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`, (data) => {
-                    clearTimeout(timeout);
-                    if (data.success) {
-                        resolve(data);
-                    } else {
-                        resolve({ success: false, error: 'Error loading storage' });
-                    }
-                });
-
-                SOCKET.emit('storage.load', {
-                    extension: MODULE_NAME,
-                    id: window.identifier,
-                    key,
-                    response: \`storage.load.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`
-                });
-            });
-        };
-
-        /**
-         * Gets the value of a stored variable, with an option to create it if it does not exist.
-         * @param {string} variableName - The variable name.
-         * @param {any} defaultValue - The default value if the variable does not exist.
-         * @param {boolean} create - Whether to create the variable if it does not exist.
-         * @returns {Promise<any>} - The value of the variable.
-         */
-        const getVariable = async (variableName, defaultValue, create = false) => {
-            const data = await getStorage(variableName);
-            if (!data.success && create) {
-                await setStorage(variableName, defaultValue);
-                return defaultValue;
-            } else if (data.success) {
-                return data.value;
-            } else {
-                return defaultValue;
-            }
-        };
-
-        /**
-         * Displays the menu with the provided options.
-         * This function is necessary for the injector to open the menu.
-         * @param {Array} options - The menu options.
-         */
-        const showMenu = function (options) {
-            console.log('Menu is shown with options:', options);
-        };
-
-        SOCKET.on('connect', () => {
-            console.log(\`\${MODULE_NAME} Connected to WebSocket server\`);
-
-            socket.on(\`\${MODULE_NAME}:event\`, (data) => {
-                console.log('Received event:', data);
-            });
-        });
-
-        SOCKET.on('disconnect', () => {
-            console.log(\`\${MODULE_NAME} Disconnected from WebSocket server\`);
-        });
-
-        return {
-            MODULE_NAME,
-            KEYBOARD_COMMANDS,
-            setStorage,
-            getStorage,
-            getVariable,
-            showMenu,
-            SOCKET
-        };
+     * Function to create a module context with WebSocket, storage, and custom data capabilities.
+     * This function returns a context object with methods that allow interaction with WebSocket events, 
+     * storage, and custom data management.
+     *
+     * @param {string} moduleName - The name of the module.
+     * @returns {{
+     *   MODULE_NAME: string,
+     *   SOCKET: object,
+     *   KEYBOARD_COMMANDS: Array<object>,
+     *   setStorage: (key: string, value: any, isGlobal: boolean) => Promise<object>,
+     *   getStorage: (key: string, isGlobal: boolean) => Promise<object>,
+     *   getVariable: (variableName: string, defaultValue: any, create: boolean, isGlobal: boolean) => Promise<any>,
+     *   showMenu: (options: Array<object>) => void,
+     *   getCustomData: (key: string) => any,
+     *   setCustomData: (key: string, value: any) => void
+     *   setMenuHandler: (handlerFunction: function) => void
+     * }} - The context object with methods for WebSocket, storage, and custom data.
+    */
+    function createContext(moduleName) {
+        return window.WSACTION.createModuleContext(moduleName);
     }
+    
+    const CONTEXT = createContext("${name.toUpperCase()}");
+    const SOCKET = CONTEXT.SOCKET;
+    CONTEXT.KEYBOARD_COMMANDS = [
+        {
+            description: "Nothing", // Default description
+            keys: [{ key: "control", uppercase: false }] // Default key binding
+        }
+    ]
 
-    const context = await MakeContext();
+    SOCKET.on('connect', () => {
+        console.log(\`\${CONTEXT.MODULE_NAME} Connected to WebSocket server\`);
+
+        SOCKET.on(\`\${CONTEXT.MODULE_NAME}:event\`, (data) => {
+            console.log('Received event:', data);
+        });
+    });
+
+    SOCKET.on('disconnect', () => {
+        console.log(\`\${CONTEXT.MODULE_NAME} Disconnected from WebSocket server\`);
+    });
 
     // Register the extension in the global context
     if (window.extensionContext) {
-        window.extensionContext.addExtension(context.MODULE_NAME, {
+        window.extensionContext.addExtension(CONTEXT.MODULE_NAME, {
             location: window.location,
-            ...context
-        });
-
-        // Register the extension in the control panel
-        // if (window.extensionContext.isExtensionLoaded(context)) {
-        //     window.extensionContext.emit('extensionLoaded', context.MODULE_NAME);
-        // }    
+            ...CONTEXT
+        });   
     }
 })();
     `;

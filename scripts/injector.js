@@ -62,7 +62,6 @@
     }
 
     async function loadExtension(extension){
-        console.log(extension)
         const scriptUrl = `http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/ext/${extension.NAME}/client`;
         await addScript(scriptUrl);
     }
@@ -89,6 +88,7 @@
             `http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/js/jquery-3.6.0.min.js`,
             `http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/js/sweetalert2.js`,
             `http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/js/socket.io.js`,
+            `http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/js/ModuleBase.js`,
         ];
         try {
             await Promise.all(libraries.map(addScript));

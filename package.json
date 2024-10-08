@@ -1,6 +1,6 @@
 {
   "name": "wsaction",
-  "version": "2.7.0",
+  "version": "2.7.2",
   "main": "tsc-build/src/index.js",
   "bin": "tsc-build/src/index.js",
   "scripts": {
@@ -20,7 +20,8 @@
       "node_modules/puppeteer/.local-chromium/**/*",
       "node_modules/puppeteer-extra-plugin-stealth/evasions/**/*",
       "node_modules/puppeteer-extra-plugin-stealth/**/*",
-      "node_modules/puppeteer-extra-plugin-stealth/evasions/**/*.js"
+      "node_modules/puppeteer-extra-plugin-stealth/evasions/**/*.js",
+      "node_modules/figlet/fonts/Standard.flf"
     ],
     "targets": [
       "node18-win-x64"
@@ -36,6 +37,7 @@
     "@types/archiver": "^6.0.2",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/figlet": "^1.5.8",
     "@types/node": "^20.16.5",
     "@types/node-schedule": "^2.1.7",
     "@types/progress": "^2.0.7",
@@ -56,6 +58,7 @@
     "cloudflare-puppeteer-extra": "^1.0.1",
     "cors": "^2.8.5",
     "express": "^4.21.0",
+    "figlet": "^1.7.0",
     "inquirer": "^11.1.0",
     "node-schedule": "^2.1.1",
     "open": "^10.1.0",
