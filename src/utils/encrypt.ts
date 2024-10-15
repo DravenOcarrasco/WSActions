@@ -1,13 +1,13 @@
 import crypto from 'crypto';
 import os from 'os';
-import { execSync } from 'child_process';
 
-// Chave secreta para criptografia (use um valor mais seguro em produção e tenha certeza que ela tem 32 bytes)
-const IV_LENGTH = 16; // Tamanho do vetor de inicialização (IV)
+// Defina o tamanho do vetor de inicialização (IV)
+const IV_LENGTH = 16;
 
 class Encripty {
     private secretKey: Buffer;
 
+    // Construtor que recebe uma chave secreta e verifica seu tamanho
     constructor(secretKey: string) {
         if (secretKey.length !== 32) {
             throw new Error('A chave secreta deve ter exatamente 32 caracteres.');
@@ -21,7 +21,7 @@ class Encripty {
         const cipher = crypto.createCipheriv('aes-256-cbc', this.secretKey, iv);
         let encrypted = cipher.update(text);
         encrypted = Buffer.concat([encrypted, cipher.final()]);
-        return iv.toString('hex') + ':' + encrypted.toString('hex'); // Retorna IV e o texto encriptado
+        return iv.toString('hex') + ':' + encrypted.toString('hex'); // Retorna o IV e o texto encriptado
     }
 
     // Função para decriptar dados
@@ -36,22 +36,6 @@ class Encripty {
     }
 }
 
-// Função para obter o endereço MAC
-function getMacAddress(): string {
-    const networkInterfaces = os.networkInterfaces();
-    for (const interfaceName of Object.keys(networkInterfaces)) {
-        const interfaces = networkInterfaces[interfaceName];
-        if (interfaces) {
-            for (const net of interfaces) {
-                if (net.mac !== '00:00:00:00:00:00' && !net.internal) {
-                    return net.mac;
-                }
-            }
-        }
-    }
-    return '00:00:00:00:00:00';
-}
-
 // Função para obter o nome do host
 function getHostName(): string {
     return os.hostname();
@@ -62,34 +46,15 @@ function getOSVersion(): string {
     return `${os.type()} ${os.release()}`;
 }
 
-// Função para obter o ID do disco (ou número de série) no Windows/Linux
-function getDiskSerial(): string {
-    try {
-        if (process.platform === 'win32') {
-            const output = execSync('wmic diskdrive get SerialNumber').toString();
-            return output.split('\n')[1].trim(); // Pega o número de série do primeiro disco
-        }
-        if (process.platform === 'linux' || process.platform === 'darwin') {
-            const output = execSync('cat /sys/class/dmi/id/product_uuid').toString().trim();
-            return output;
-        }
-    } catch (err) {
-        console.error('Erro ao obter o número de série do disco:', err);
-    }
-    return 'unknown';
-}
-
-// Função para gerar uma chave única com base nas informações do sistema
+// Função para gerar uma chave única com base em informações estáveis do sistema
 function generateUniqueKey(): string {
-    const macAddress = getMacAddress();
     const hostName = getHostName();
     const osVersion = getOSVersion();
-    const diskSerial = getDiskSerial();
 
-    // Combine todas as informações
-    const systemInfo = `${macAddress}-${hostName}-${osVersion}-${diskSerial}`;
+    // Combine informações do sistema para gerar uma chave única
+    const systemInfo = `${hostName}-${osVersion}`;
 
-    // Gerar um hash SHA-256 da combinação das informações
+    // Gerar um hash SHA-256 das informações
     const hash = crypto.createHash('sha256');
     hash.update(systemInfo);
     return hash.digest('hex').substring(0, 32); // Retorna os primeiros 32 caracteres para uma chave de 32 bytes

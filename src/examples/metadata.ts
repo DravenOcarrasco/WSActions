@@ -7,8 +7,11 @@ export default function mount({
     version = "1.0.0",
     github = "",
     minVersion = "",
-    compatibility = [],
-    id = generateUniqueId()
+    compatibility = [] as string[],
+    id = generateUniqueId(),
+    WEB_SCRIPTS = [
+        'client.js'
+    ] as string[]
 } = {}) {
     return {
         name,
@@ -16,6 +19,7 @@ export default function mount({
         github,
         minVersion,
         compatibility,
-        id
+        id,
+        WEB_SCRIPTS
     }
 }

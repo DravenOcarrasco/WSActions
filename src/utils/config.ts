@@ -94,3 +94,5 @@ export const loadConfig = (): Config => {
 // Obter o diretório temporário padrão do sistema
 const tempDir = os.tmpdir();
 export const tempExtensionDir = path.resolve(tempDir, 'wsaction-extensions');
+export const extensionsPath = path.resolve(process.cwd(), 'extensions');
+export const storagePath = path.resolve(process.cwd(), 'storage.json');

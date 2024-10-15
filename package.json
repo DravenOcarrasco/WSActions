@@ -1,6 +1,6 @@
 {
   "name": "wsaction",
-  "version": "2.7.2",
+  "version": "2.7.4",
   "main": "tsc-build/src/index.js",
   "bin": "tsc-build/src/index.js",
   "scripts": {
@@ -55,6 +55,7 @@
     "@types/yargs": "^17.0.33",
     "archiver": "^7.0.1",
     "axios": "^1.7.7",
+    "cli-table3": "^0.6.5",
     "cloudflare-puppeteer-extra": "^1.0.1",
     "cors": "^2.8.5",
     "express": "^4.21.0",

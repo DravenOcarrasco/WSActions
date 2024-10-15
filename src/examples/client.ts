@@ -19,6 +19,7 @@ export default function mount(name: string) {
      *   setStorage: (key: string, value: any, isGlobal: boolean) => Promise<object>,
      *   getStorage: (key: string, isGlobal: boolean) => Promise<object>,
      *   getVariable: (variableName: string, defaultValue: any, create: boolean, isGlobal: boolean) => Promise<any>,
+     *   setVariable: (variableName: string, value: any, isGlobal: boolean) => Promise<void>,    // Function to set a variable in local or global storage.
      *   showMenu: (options: Array<object>) => void,
      *   getCustomData: (key: string) => any,
      *   setCustomData: (key: string, value: any) => void
@@ -51,8 +52,8 @@ export default function mount(name: string) {
     });
 
     // Register the extension in the global context
-    if (window.extensionContext) {
-        window.extensionContext.addExtension(CONTEXT.MODULE_NAME, {
+    if (window.WSACTION.CONTEXT_MANAGER) {
+        window.WSACTION.CONTEXT_MANAGER.addExtension(CONTEXT.MODULE_NAME, {
             location: window.location,
             ...CONTEXT
         });   

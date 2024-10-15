@@ -18,7 +18,7 @@ const execPath = process.execPath;
 const execDir = execPath.includes("bun.exe") || execPath.includes("node.exe")
     ? path.dirname(__dirname)
     : path.dirname(execPath);
-console.log(chalk.blue(`EXT_PATH: ${path.resolve(execDir, 'extensions')}`));
+// console.log(chalk.blue(`EXT_PATH: ${path.resolve(execDir, 'extensions')}`));
 
 // Inicializando o Express
 const app: Application = express();
@@ -77,7 +77,7 @@ let ExtensionsMenu: any = {};
 
 // Função para exibir o menu
 function showMenu() {
-    console.clear();  // Limpa o terminal para melhor visualização do menu
+    //console.clear();  // Limpa o terminal para melhor visualização do menu
 
     // Mostrar extensões habilitadas e desabilitadas logo após limpar o terminal
     const enabledExtensions = ModuleController.EXTENSIONS.ENABLED.length > 0

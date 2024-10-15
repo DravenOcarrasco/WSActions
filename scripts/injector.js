@@ -4,27 +4,19 @@
     let CONTEXTS = {};
 
     let floatingWindow;
-
-    if (window.extensionContext) {
-        return;
+    
+    if(!window.WSACTION){
+        window.WSACTION = {}
     }
 
-    window.extensionContext = {
+    if (window.WSACTION.CONTEXT_MANAGER) {
+        return;
+    }
+    
+    window.WSACTION.CONTEXT_MANAGER = {
         extensions: {},
         events: {},
         initialized: true,
-        addExtension: function (name, context) {
-            if (this.extensions[name] == undefined) {
-                this.extensions[name] = context;
-                this.emit('extensionLoaded', context); // Emite evento quando uma extensão é carregada
-            }
-        },
-        getExtension: function (name) {
-            return this.extensions[name] || null;
-        },
-        isExtensionLoaded: function (context) {
-            return this.extensions.hasOwnProperty(context.NAME);
-        },
         on: function (event, listener) {
             if (!this.events[event]) {
                 this.events[event] = [];
@@ -38,8 +30,43 @@
         emit: function (event, data) {
             if (!this.events[event]) return;
             this.events[event].forEach(listener => listener(data));
+        },
+
+        // Função para aguardar uma extensão ser adicionada
+        awaitExtension: function (name) {
+            return new Promise((resolve, reject) => {
+                // Verifica se a extensão já foi carregada
+                if (this.extensions[name]) {
+                    resolve(this.extensions[name]);
+                } else {
+                    // Listener para a extensão
+                    const listener = (context) => {
+                        if (context.NAME === name) {
+                            resolve(context);
+                            this.off('extensionLoaded', listener); // Remove o listener após resolver
+                        }
+                    };
+                    // Escuta o evento 'extensionLoaded'
+                    this.on('extensionLoaded', listener);
+                }
+            });
+        },
+        addExtension: function (name, context) {
+            if (this.extensions[name] == undefined) {
+                this.extensions[name] = context;
+                this.emit('extensionLoaded', context); // Emite evento quando uma extensão é carregada
+            }
+        },
+        getExtension: function (name) {
+            return this.extensions[name] || null;
+        },
+        isExtensionLoaded: function (context) {
+            return this.extensions.hasOwnProperty(context.NAME);
         }
     };
+
+    //modo de compatibilidade < 2.7.2
+    window.extensionContext = window.WSACTION.CONTEXT_MANAGER
 
     function addScript(src) {
         return new Promise((resolve, reject) => {
@@ -62,7 +89,7 @@
     }
 
     async function loadExtension(extension){
-        const scriptUrl = `http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/ext/${extension.NAME}/client`;
+        const scriptUrl = `http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}/ext/${extension.NAME.replaceAll(' ','_')}/client`;
         await addScript(scriptUrl);
     }
 
@@ -92,7 +119,6 @@
         ];
         try {
             await Promise.all(libraries.map(addScript));
-            console.info('Todas as bibliotecas foram carregadas com sucesso.');
         } catch (error) {
             console.error('Erro ao carregar as bibliotecas:', error);
         }
@@ -227,7 +253,7 @@
         }
     });
 
-    window.extensionContext.on('extensionLoaded', function (context) {
+    window.WSACTION.CONTEXT_MANAGER.on('extensionLoaded', function (context) {
         CONTEXTS[context.MODULE_NAME] = context;
         registerExtension(context.MODULE_NAME);
     });

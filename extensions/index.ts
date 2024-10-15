@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import express, { Application, Router } from 'express';
 import { Server as SocketIoServer, Socket } from 'socket.io';
-import os from 'os'
 import readline from 'readline';
 import { tempExtensionDir } from '../src/utils/config';
 
@@ -13,13 +12,16 @@ const execDir = execPath.includes("bun.exe") || execPath.includes("node.exe")
     : path.dirname(execPath);
 
 const extensionsPath = path.resolve(process.cwd(), 'extensions');
-const storagePath = path.resolve(process.cwd(), 'storage.json'); // Path for storage file
+const storagePath = path.resolve(process.cwd(), 'storage.json'); // Caminho para o arquivo de armazenamento
 
-// Verificar se a pasta existe, se não, criar a pasta
+// Verificar se a pasta de extensões temporárias existe, se não, criar
 if (!fs.existsSync(tempExtensionDir)) {
     fs.mkdirSync(tempExtensionDir, { recursive: true });
-} else {}
+}
 
+// ///////////////////////////////////////////////////////
+// Definição de Interfaces
+// ///////////////////////////////////////////////////////
 
 interface Extension {
     NAME: string;
@@ -29,15 +31,17 @@ interface Extension {
     ROUTER: Router;
     onInitialize: () => void;
     onError?: (error: any) => void;
+    WEB_SCRIPTS: string[]
 }
 
 interface Command {
-    [key: string]: { _function: (...args: any[]) => void; description?: string };
+    _function: (...args: any[]) => void;
+    description?: string;
 }
 
 interface Commands {
-    IO: Record<string, Command>;
-    CLI: Record<string, Command>;
+    IO: Record<string, Record<string, Command>>;
+    CLI: Record<string, Record<string, Command>>;
 }
 
 interface StorageHandlers {
@@ -45,6 +49,287 @@ interface StorageHandlers {
     load: (data: any) => any;
     delete: (data: any) => void;
 }
+
+// ///////////////////////////////////////////////////////
+// Funções de Gerenciamento de Armazenamento
+// ///////////////////////////////////////////////////////
+
+/**
+ * Cria um objeto proxy para monitorar mudanças e salvar o armazenamento.
+ */
+const createStorageProxy = (saveStorage: () => void): Record<string, any> => {
+    return new Proxy<Record<string, any>>({}, {
+        set(target, key, value) {
+            target[key as string] = value;
+            saveStorage();
+            return true;
+        },
+        deleteProperty(target, key) {
+            delete target[key as string];
+            saveStorage();
+            return true;
+        }
+    });
+};
+
+/**
+ * Funções utilitárias para manipulação de valores aninhados no armazenamento.
+ */
+const storageUtils = {
+    setNestedValue: (obj: Record<string, any>, keys: string[], value: any, saveStorage: () => void) => {
+        const lastKey = keys.pop() as string;
+        const lastObj = keys.reduce((acc, key) => acc[key] = acc[key] || {}, obj);
+        lastObj[lastKey] = value;
+        saveStorage();
+    },
+
+    getNestedValue: (obj: Record<string, any>, keys: string[]) => {
+        return keys.reduce((acc, key) => (acc && acc[key] !== undefined) ? acc[key] : undefined, obj);
+    },
+
+    deleteNestedValue: (obj: Record<string, any>, keys: string[], saveStorage: () => void) => {
+        const lastKey = keys.pop() as string;
+        const lastObj = keys.reduce((acc, key) => acc[key] = acc[key] || {}, obj);
+        delete lastObj[lastKey];
+        saveStorage();
+    }
+};
+
+// ///////////////////////////////////////////////////////
+// Funções de Gerenciamento de Extensões
+// ///////////////////////////////////////////////////////
+
+/**
+ * Cria o diretório de extensões se ele não existir.
+ */
+const createExtensionsDirectory = () => {
+    if (!fs.existsSync(extensionsPath)) {
+        fs.mkdirSync(extensionsPath, { recursive: true });
+        // console.log(`Diretório criado: ${extensionsPath}`);
+    }
+};
+
+/**
+ * Define as rotas necessárias para a extensão.
+ */
+const defineExtensionRoutes = (
+    APP: Application | null,
+    EXT: Extension,
+    extensionsPath: string,
+    BASENAME: string
+) => {
+    if (!APP) return;
+    // Rota para retornar o arquivo client.js
+    APP.get(`/ext/${EXT.NAME.replaceAll(' ', '_')}/client`, (req: express.Request, res: express.Response) => {
+        let combinedScript = '';
+        let scripts = EXT.WEB_SCRIPTS ?? ['client.js']
+        // Percorre os scripts definidos em EXT.WEB_SCRIPTS
+        scripts.forEach((scriptName, index) => {
+            const filePath = path.resolve(extensionsPath, BASENAME, scriptName);
+    
+            if (fs.existsSync(filePath)) {
+                const fileContent = fs.readFileSync(filePath, 'utf-8');
+                combinedScript += fileContent;
+                combinedScript += `\n`;
+            } else {
+                return res.status(404).send(`${scriptName} not found`);
+            }
+    
+            // Se for o último arquivo, enviar a resposta concatenada
+            if (index === scripts.length - 1) {
+                res.setHeader('Content-Type', 'application/javascript');
+                res.send(combinedScript);
+            }
+        });
+    });
+
+    // Rota para recursos estáticos
+    APP.use(`/ext/${EXT.NAME.replaceAll(' ','_')}/resources`, express.static(path.join(extensionsPath, BASENAME, 'resources')));
+
+    // Rota para o ícone da extensão
+    APP.get(`/ext/${EXT.NAME.replaceAll(' ','_')}/icon`, (req: express.Request, res: express.Response) => {
+        const filePath = path.resolve(extensionsPath, BASENAME, 'icon.png');
+        fs.readFile(filePath, (err, data) => {
+            if (err) {
+                res.status(500).send(`${filePath} not found`);
+            } else {
+                const base64Image = Buffer.from(data).toString('base64');
+                res.send(`data:image/png;base64,${base64Image}`);
+            }
+        });
+    });
+
+    // Usa o roteador da extensão
+    APP.use(`/ext/${EXT.NAME.replaceAll(' ','_')}`, EXT.ROUTER);
+};
+
+/**
+ * Carrega todas as extensões de um diretório específico.
+ */
+const loadExtensionsFromDirectory = (
+    directoryPath: string,
+    WSIO: SocketIoServer | null,
+    APP: Application | null,
+    RL: readline.Interface | null,
+    STORAGE: Record<string, any>,
+    saveStorage: () => void,
+    EXTENSIONS: { ENABLED: Extension[], DISABLED: Extension[] },
+    COMMANDS: Commands,
+    expressInstance: any
+) => {
+    if (!fs.existsSync(directoryPath)) return;
+    
+    fs.readdirSync(directoryPath).forEach(extensionDir => {
+        const extensionPath = path.join(directoryPath, extensionDir);
+        const metaPath = path.join(extensionPath, "meta.json");
+
+        if (fs.statSync(extensionPath).isDirectory() && fs.existsSync(metaPath)) {
+            const extensionModule = require(extensionPath);
+            const BASENAME = path.basename(extensionPath);
+
+            if (typeof extensionModule !== 'function') {
+                console.error(`Extensão inválida: ${extensionDir}`);
+                return;
+            }
+            let WEB_SCRIPTS = [
+                'client.js'
+            ]
+            try{
+                const META_JSON = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+                WEB_SCRIPTS = META_JSON?.WEB_SCRIPTS
+                if(!WEB_SCRIPTS){
+                    WEB_SCRIPTS = [
+                        'client.js'
+                    ]
+                }
+            }catch{
+                WEB_SCRIPTS = [
+                    'client.js'
+                ]
+            }
+            let EXT: Extension = {
+                NAME: 'unknown',
+                ENABLED: false,
+                IOEVENTS: {},
+                COMMANDS: {},
+                ROUTER: express.Router(),
+                onInitialize: () => {},
+                WEB_SCRIPTS: [] as string[]
+            };
+
+            try {
+                EXT = extensionModule(WSIO, APP, RL, { data: STORAGE, save: saveStorage }, expressInstance, WEB_SCRIPTS );
+                if (EXT.ENABLED) {
+                    EXT.onInitialize();
+                    EXTENSIONS.ENABLED.push(EXT);
+
+                    // Criar registro no armazenamento para a extensão
+                    if (!STORAGE[EXT.NAME]) {
+                        STORAGE[EXT.NAME] = {};
+                    }
+
+                    // Configurar comandos CLI
+                    if (EXT.COMMANDS) {
+                        for (const [event, handler] of Object.entries(EXT.COMMANDS)) {
+                            WSIO?.on(`${EXT.NAME}.${event}`, handler._function);
+                            if (!COMMANDS.CLI[EXT.NAME]) {
+                                COMMANDS.CLI[EXT.NAME] = {} as Record<string, Command>;
+                            }
+                            COMMANDS.CLI[EXT.NAME][event] = handler;
+                        }
+                    }
+
+                    // Configurar eventos IO
+                    if (EXT.IOEVENTS) {
+                        for (const [event, handler] of Object.entries(EXT.IOEVENTS)) {
+                            if (!COMMANDS.IO[EXT.NAME]) {
+                                COMMANDS.IO[EXT.NAME] = {} as Record<string, Command>;
+                            }
+                            COMMANDS.IO[EXT.NAME][event] = handler;
+                        }
+                    }
+                } else {
+                    EXTENSIONS.DISABLED.push(EXT);
+                }
+
+                // Define as rotas para a extensão
+                defineExtensionRoutes(APP, EXT, directoryPath, BASENAME);
+            } catch (error) {
+                console.error(`Erro ao carregar extensão ${extensionDir}: ${error}`);
+                EXT.ENABLED = false;
+                EXTENSIONS.DISABLED.push(EXT);
+                if (EXT.onError) {
+                    EXT.onError(error);
+                }
+            }
+        }
+    });
+};
+
+/**
+ * Carrega todas as extensões de diretórios especificados.
+ */
+const loadAllExtensions = (
+    WSIO: SocketIoServer | null,
+    APP: Application | null,
+    RL: readline.Interface | null,
+    STORAGE: Record<string, any>,
+    saveStorage: () => void,
+    EXTENSIONS: { ENABLED: Extension[], DISABLED: Extension[] },
+    COMMANDS: Commands
+) => {
+    loadExtensionsFromDirectory(extensionsPath, WSIO, APP, RL, STORAGE, saveStorage, EXTENSIONS, COMMANDS, express);
+    loadExtensionsFromDirectory(tempExtensionDir, WSIO, APP, RL, STORAGE, saveStorage, EXTENSIONS, COMMANDS, express);
+
+    // Rota para listar extensões
+    if (APP) {
+        APP.get(`/extensions`, (req: express.Request, res: express.Response) => {
+            res.json({
+                ENABLED: EXTENSIONS.ENABLED,
+                DISABLED: EXTENSIONS.DISABLED
+            });
+        });
+    }
+};
+
+// ///////////////////////////////////////////////////////
+// Funções de Gerenciamento de WebSocket
+// ///////////////////////////////////////////////////////
+
+/**
+ * Registra os handlers de armazenamento para eventos WebSocket.
+ */
+const registerStorageHandlers = (
+    WSIO: SocketIoServer | null,
+    storageHandlers: StorageHandlers
+) => {
+    if (!WSIO) return;
+
+    WSIO.on('connection', (socket: Socket) => {
+        socket.on('storage.store', (data) => {
+            storageHandlers.save(data);
+            socket.emit(data.response, { success: true });
+        });
+
+        socket.on('storage.load', (data) => {
+            const value = storageHandlers.load(data);
+            if (value === undefined) {
+                socket.emit(data.response, { success: false });
+            } else {
+                socket.emit(data.response, { success: true, value });
+            }
+        });
+
+        socket.on('storage.delete', (data) => {
+            storageHandlers.delete(data);
+            socket.emit(data.response, { success: true });
+        });
+    });
+};
+
+// ///////////////////////////////////////////////////////
+// ModuleController IIFE
+// ///////////////////////////////////////////////////////
 
 const ModuleController = (() => {
     // Variáveis globais
@@ -63,164 +348,12 @@ const ModuleController = (() => {
     };
 
     // Cria um objeto proxy para monitorar mudanças e salvar o armazenamento
-    const STORAGE = new Proxy({}, {
-        set(target: any, key: any, value) {
-            target[key] = value;
-            saveStorage();
-            return true;
-        },
-        deleteProperty(target: any, key: any) {
-            delete target[key];
-            saveStorage();
-            return true;
-        }
-    });
-
-    /**
-     * Inicializa o controlador de módulos, definindo o APP e WSIO,
-     * criando o diretório de extensões, se necessário, e carregando as extensões.
-     * 
-     * @param wsio - Instância do WebSocket IO
-     * @param app - Instância do Express
-     * @param rl - Instância do Readline
-     */
-    const init = (wsio: SocketIoServer, app: Application, rl: readline.Interface) => {
-        APP = app;
-        WSIO = wsio;
-        RL = rl;
-        createExtensionsDirectory();
-        loadStorage();
-        loadAllExtensions();
-        registerStorageHandlers(WSIO); // Register storage handlers
-    };
-
-    const initIoToSocket = (socket: Socket) => {
-        for (const EXT of EXTENSIONS.ENABLED) {
-            for (const [event, handler] of Object.entries(EXT.IOEVENTS)) {
-                socket.on(`${EXT.NAME}.${event}`, handler._function);
-            }
-        }
-    };
-
-    /**
-     * Cria o diretório de extensões se ele não existir.
-     */
-    const createExtensionsDirectory = () => {
-        if (!fs.existsSync(extensionsPath)) {
-            fs.mkdirSync(extensionsPath, { recursive: true });
-            console.log(`Diretório criado: ${extensionsPath}`);
-        }
-    };
-
-    const loadExtensionsFromDirectory = (
-        extensionsPath: string, 
-        WSIO: any, 
-        APP: any, 
-        RL: any, 
-        STORAGE: Storage, 
-        saveStorage: () => void, 
-        EXTENSIONS: { ENABLED: Extension[], DISABLED: Extension[] }, 
-        COMMANDS: { CLI: Record<string, any>, IO: Record<string, any> },
-        express: any
-    ) => {
-        if (!fs.existsSync(extensionsPath)) return;
-        fs.readdirSync(extensionsPath).forEach(extensionDir => {
-            const extensionPath = path.join(extensionsPath, extensionDir);
-            if (fs.statSync(extensionPath).isDirectory() && fs.existsSync(path.join(extensionPath, "meta.json"))) {
-                const extensionModule = require(extensionPath);
-                if (typeof extensionModule === 'function') {
-                    let EXT: Extension = {} as Extension;
-                    try {
-                        EXT = extensionModule(WSIO, APP, RL, { data: STORAGE, save: saveStorage }, express);
-                        if (EXT.ENABLED) {
-                            EXT.onInitialize();
-                            EXTENSIONS.ENABLED.push(EXT);
-    
-                            // Criar registro no armazenamento para a extensão
-                            if (!STORAGE[EXT.NAME]) {
-                                STORAGE[EXT.NAME] = {};
-                            }
-    
-                            // Configurar comandos
-                            if (EXT.COMMANDS) {
-                                for (const [event, handler] of Object.entries(EXT.COMMANDS)) {
-                                    WSIO?.on(`${EXT.NAME}.${event}`, handler._function);
-                                    if (!COMMANDS.CLI[EXT.NAME]) {
-                                        COMMANDS.CLI[EXT.NAME] = {};
-                                    }
-                                    COMMANDS.CLI[EXT.NAME][event] = handler;
-                                }
-                            }
-    
-                            // Configurar eventos IO
-                            if (EXT.IOEVENTS) {
-                                for (const [event, handler] of Object.entries(EXT.IOEVENTS)) {
-                                    if (!COMMANDS.IO[EXT.NAME]) {
-                                        COMMANDS.IO[EXT.NAME] = {};
-                                    }
-                                    COMMANDS.IO[EXT.NAME][event] = handler;
-                                }
-                            }
-                        } else {
-                            EXTENSIONS.DISABLED.push(EXT);
-                        }
-    
-                        // Define a rota para retornar o arquivo client.js
-                        APP?.get(`/ext/${EXT.NAME}/client`, (req:any, res:any) => {
-                            const filePath = path.resolve(extensionsPath, EXT.NAME, './client.js');
-                            res.sendFile(filePath, (err:any) => {
-                                if (err) {
-                                    res.status(500).send(`${filePath} not found`);
-                                }
-                            });
-                        });
-    
-                        // Define a rota para retornar o ícone
-                        APP?.get(`/ext/${EXT.NAME}/icon`, (req:any, res:any) => {
-                            const filePath = path.resolve(extensionsPath, EXT.NAME, 'icon.png');
-                            fs.readFile(filePath, (err, data) => {
-                                if (err) {
-                                    res.status(500).send(`${filePath} not found`);
-                                } else {
-                                    const base64Image = Buffer.from(data).toString('base64');
-                                    res.send(`data:image/png;base64,${base64Image}`);
-                                }
-                            });
-                        });
-    
-                        // Usa o roteador da extensão
-                        APP?.use(`/ext/${EXT.NAME}`, EXT.ROUTER);
-                    } catch (error) {
-                        console.error(`Erro ao carregar extensão: ${error}`);
-                        EXT.ENABLED = false;
-                        EXTENSIONS.DISABLED.push(EXT);
-                        if (EXT.onError) {
-                            EXT.onError(error);
-                        }
-                    }
-                } else {
-                    console.error(`Extensão inválida: ${extensionDir}`);
-                }
-            }
-        });
-    };
-
-    // Exemplo de uso para carregar extensões de dois diretórios
-    const loadAllExtensions = () => {
-        const extensionsPath = path.join(process.cwd(), 'extensions');
-
-        loadExtensionsFromDirectory(extensionsPath, WSIO, APP, RL, STORAGE, saveStorage, EXTENSIONS, COMMANDS, express);
-        loadExtensionsFromDirectory(tempExtensionDir, WSIO, APP, RL, STORAGE, saveStorage, EXTENSIONS, COMMANDS, express);
-
-        APP?.get(`/extensions`, (req, res) => {
-            res.json(EXTENSIONS);
-        });
-    };
+    const STORAGE = createStorageProxy(saveStorage);
 
     /**
      * Carrega o armazenamento do arquivo de armazenamento.
      */
-    const loadStorage = () => {
+    function loadStorage() {
         if (fs.existsSync(storagePath)) {
             const data = fs.readFileSync(storagePath, 'utf8');
             const loadedStorage = JSON.parse(data);
@@ -230,81 +363,74 @@ const ModuleController = (() => {
         } else {
             saveStorage();
         }
-    };
+    }
 
     /**
      * Salva o armazenamento no arquivo de armazenamento.
      */
-    const saveStorage = () => {
+    function saveStorage() {
         fs.writeFileSync(storagePath, JSON.stringify(STORAGE, null, 4), 'utf8');
-    };
+    }
 
-    // Função utilitária para acessar ou criar uma estrutura de dados aninhada
-    const setNestedValue = (obj: any, keys: string[], value: any) => {
-        const lastKey = keys.pop() as string;
-        const lastObj = keys.reduce((obj, key) => obj[key] = obj[key] || {}, obj);
-        lastObj[lastKey] = value;
-        saveStorage(); // Salva o armazenamento após definir o valor
-    };
-
-    const getNestedValue = (obj: any, keys: string[]) => {
-        return keys.reduce((obj, key) => (obj && obj[key] !== undefined) ? obj[key] : undefined, obj);
-    };
-
-    const deleteNestedValue = (obj: any, keys: string[]) => {
-        const lastKey = keys.pop() as string;
-        const lastObj = keys.reduce((obj, key) => obj[key] = obj[key] || {}, obj);
-        delete lastObj[lastKey];
-        saveStorage(); // Salva o armazenamento após deletar o valor
-    };
-
-    // Handlers for WebSocket events
-    const storageHandlers: StorageHandlers = {
+    /**
+     * Funções utilitárias para manipulação de armazenamento.
+     */
+    const storageHandler: StorageHandlers = {
         save: (data) => {
             const keys = [data.extension, data.id, ...data.key.split('.')];
-            setNestedValue(STORAGE, keys, data.value);
+            storageUtils.setNestedValue(STORAGE, keys, data.value, saveStorage);
         },
         load: (data) => {
             const keys = [data.extension, data.id, ...data.key.split('.')];
-            const value = getNestedValue(STORAGE, keys);
-            return value;
+            return storageUtils.getNestedValue(STORAGE, keys);
         },
         delete: (data) => {
             const keys = [data.extension, data.id, ...data.key.split('.')];
-            deleteNestedValue(STORAGE, keys);
+            storageUtils.deleteNestedValue(STORAGE, keys, saveStorage);
         },
     };
 
-    // Register storage handlers to WebSocket events
-    const registerStorageHandlers = (wsio: SocketIoServer) => {
-        wsio.on('connection', (socket: Socket) => {
-            socket.on('storage.store', (data) => {
-                storageHandlers.save(data);
-                socket.emit(data.response, { success: true });
-            });
+    /**
+     * Inicializa o controlador de módulos.
+     * 
+     * @param wsio - Instância do WebSocket IO
+     * @param app - Instância do Express
+     * @param rl - Instância do Readline
+     */
+    function init(wsio: SocketIoServer, app: Application, rl: readline.Interface) {
+        APP = app;
+        WSIO = wsio;
+        RL = rl;
 
-            socket.on('storage.load', (data) => {
-                const value = storageHandlers.load(data);
-                if (value === undefined) {
-                    socket.emit(data.response, { success: false });
-                } else {
-                    socket.emit(data.response, { success: true, value });
-                }
-            });
+        createExtensionsDirectory();
+        loadStorage();
+        loadAllExtensions(WSIO, APP, RL, STORAGE, saveStorage, EXTENSIONS, COMMANDS);
+        registerStorageHandlers(WSIO, storageHandler);
+    }
 
-            socket.on('storage.delete', (data) => {
-                storageHandlers.delete(data);
-                socket.emit(data.response, { success: true });
+    /**
+     * Inicializa eventos IO para um socket específico.
+     * 
+     * @param socket - Instância do Socket
+     */
+    function initIoToSocket(socket: Socket) {
+        EXTENSIONS.ENABLED.forEach(EXT => {
+            Object.entries(EXT.IOEVENTS).forEach(([event, handler]) => {
+                socket.on(`${EXT.NAME}.${event}`, handler._function);
             });
         });
-    };
+    }
 
     return {
         init,
         initIoToSocket,
         registerStorageHandlers,
-        EXTENSIONS,
-        COMMANDS
+        get EXTENSIONS() {
+            return EXTENSIONS;
+        },
+        get COMMANDS() {
+            return COMMANDS;
+        }
     };
 })();
 

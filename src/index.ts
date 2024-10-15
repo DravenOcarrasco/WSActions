@@ -24,17 +24,34 @@ import ServerHandler from './ServerHandler';
 
 const IoPort = 9532;
 // Função para criar um atalho usando PowerShell
-function createShortcut(executablePath: string, shortcutName: string, args: string): Promise<string> {
+function createShortcut(
+    executablePath: string, 
+    shortcutName: string, 
+    args: string, 
+    overwrite: boolean = false // Adiciona a opção de sobrescrever o atalho
+): Promise<string> {
     const platform = process.platform;
     const currentDir = process.cwd();
 
     return new Promise((resolve, reject) => {
+        const shortcutPath = platform === 'win32' 
+            ? path.join(currentDir, `${shortcutName}.lnk`)
+            : platform === 'darwin'
+            ? path.join(currentDir, `${shortcutName}.alias`)
+            : path.join(currentDir, `${shortcutName}.desktop`);
+
+        // Verifica se o atalho já existe
+        if (fs.existsSync(shortcutPath)) {
+            if (!overwrite) {
+                return resolve(`Shortcut ${shortcutName} already exists.`);
+            } else {
+                // Remove o atalho existente antes de criar um novo
+                fs.unlinkSync(shortcutPath);
+            }
+        }
+
         if (platform === 'win32') {
             // Windows
-            const shortcutPath = path.join(currentDir, `${shortcutName}.lnk`);
-            if (fs.existsSync(shortcutPath)) {
-                return resolve(`Shortcut ${shortcutName} already exists.`);
-            }
             const powershellScript = `
                 $WScriptShell = New-Object -ComObject WScript.Shell;
                 $Shortcut = $WScriptShell.CreateShortcut('${shortcutPath}');
@@ -53,10 +70,6 @@ function createShortcut(executablePath: string, shortcutName: string, args: stri
             });
         } else if (platform === 'darwin') {
             // macOS
-            const shortcutPath = path.join(currentDir, `${shortcutName}.alias`);
-            if (fs.existsSync(shortcutPath)) {
-                return resolve(`Shortcut ${shortcutName} already exists.`);
-            }
             const applescript = `
                 tell application "Finder"
                     make alias file to POSIX file "${executablePath}" at POSIX file "${currentDir}"
@@ -72,10 +85,6 @@ function createShortcut(executablePath: string, shortcutName: string, args: stri
             });
         } else if (platform === 'linux') {
             // Linux
-            const shortcutPath = path.join(currentDir, `${shortcutName}.desktop`);
-            if (fs.existsSync(shortcutPath)) {
-                return resolve(`Shortcut ${shortcutName} already exists.`);
-            }
             const desktopEntry = `[Desktop Entry]
                 Name=${shortcutName}
                 Exec=${executablePath} ${args}
@@ -94,8 +103,8 @@ function createShortcut(executablePath: string, shortcutName: string, args: stri
         }
     });
 }
-createShortcut(path.resolve(process.execPath), 'Run-Server', 'server')
-createShortcut(path.resolve(process.execPath), 'Open-chrome', 'open-chrome')
+createShortcut(path.resolve(process.execPath), 'Run-Server', 'server', true)
+createShortcut(path.resolve(process.execPath), 'Open-chrome', 'open-chrome', true)
 
 // Função para criar uma extensão
 async function createExtension(name: string) {
@@ -115,7 +124,10 @@ async function createExtension(name: string) {
         name,
         minVersion: ABOUT.VERSION,
         github: "https://github.com/myextension",
-        compatibility: [`${ABOUT.VERSION}`]
+        compatibility: [`${ABOUT.VERSION}`],
+        WEB_SCRIPTS : [
+            'client.js'
+        ]
     });
 
     fs.writeFileSync(path.join(extensionDir, 'index.js'), indexFileContent.trim());

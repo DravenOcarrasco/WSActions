@@ -114,6 +114,23 @@ function createModuleContext(name) {
         }
     }
 
+    /**
+     * Set a variable in storage.
+     * @param {string} variableName - The name of the variable to set.
+     * @param {any} value - The value to store.
+     * @param {boolean} isGlobal - Whether to store the variable globally.
+     * @returns {Promise<void>} - Resolves when the variable has been set.
+     */
+    async function setVariable(variableName, value, isGlobal = false) {
+        try {
+            // Store the value in storage, either globally or locally
+            await setStorage(variableName, value, isGlobal);
+        } catch (error) {
+            console.error(`Error setting variable '${variableName}':`, error);
+        }
+    }
+
+
     // Initial definition of the menu handler
     var MENU_HANDLE = (options) => {};
 
@@ -170,6 +187,7 @@ function createModuleContext(name) {
         setStorage,
         getStorage,
         getVariable,
+        setVariable,
         showMenu,
         getCustomData,   // Access custom data
         setCustomData,    // Store custom data

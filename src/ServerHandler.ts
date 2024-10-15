@@ -1,4 +1,4 @@
-import { existsSync} from 'fs';
+import { existsSync, unlinkSync } from 'fs';
 import express from 'express';
 import { spawn } from 'child_process';
 import { createSeparateWebSocketServer } from './modules/cli-websocket';
@@ -11,7 +11,7 @@ import chalk from 'chalk';
 import figlet from 'figlet';
 import ABOUT from './about';
 import path from 'path';
-import extensions from '../extensions'
+import extensions from '../extensions';
 
 const app = express();
 app.use(express.json());
@@ -45,7 +45,6 @@ const serverInit = async (IoPort: number) => {
     let { io } = await createSeparateWebSocketServer(IoPort);
     const { scheduleProfiles } = await import('./modules/schedule');
     scheduleProfiles();
-
 };
 
 // Função para abrir o Google Chrome com base no sistema operacional
@@ -84,18 +83,31 @@ const openChrome = (url: string) => {
     }
 };
 
-// Função para reiniciar o processo
-const restartProcess = () => {
-    console.log(chalk.yellow('Tentando reiniciar o processo...'));
+// Função para reiniciar o processo usando atalhos
+const restartProcess = (shortcutName: string) => {
+    console.log(chalk.yellow(`Tentando reiniciar o processo usando o atalho ${shortcutName}...`));
 
-    const executableName = path.basename(process.argv[0]); // Nome do executável atual
     const isWindows = process.platform === 'win32';
     const isLinux = process.platform === 'linux';
+    const currentDir = process.cwd();
+
+    // Caminho do atalho
+    const shortcutPath = isWindows
+        ? path.join(currentDir, `${shortcutName}.lnk`)
+        : isLinux
+        ? path.join(currentDir, `${shortcutName}.desktop`)
+        : '';
+
+    // Verifica se o atalho existe
+    if (!existsSync(shortcutPath)) {
+        console.error(chalk.red(`O atalho ${shortcutName} não foi encontrado.`));
+        return;
+    }
 
     // Função para iniciar o processo filho e encerrar o pai
     const startProcess = (command: string, args: string[]) => {
         const subprocess = spawn(command, args, {
-            cwd: process.cwd(), // O cwd já está definido, então basta o nome do executável
+            cwd: process.cwd(),
             detached: true,
             stdio: 'inherit',
             shell: true
@@ -113,11 +125,13 @@ const restartProcess = () => {
     };
 
     if (isWindows) {
-        console.log(chalk.blue(`Executando o executável do Windows diretamente...`));
-        startProcess(executableName, ['server']); // Apenas o nome do executável e os parâmetros
+        console.log(chalk.blue(`Reiniciando processo no Windows usando o atalho ${shortcutName}.lnk...`));
+        // Executa o atalho diretamente
+        startProcess('explorer', [shortcutPath]);
     } else if (isLinux) {
-        console.log(chalk.blue('Executando o executável no Linux...'));
-        startProcess(executableName, ['server']); // Mesmo conceito para Linux
+        console.log(chalk.blue(`Reiniciando processo no Linux usando o atalho ${shortcutName}.desktop...`));
+        // Executa o atalho diretamente no Linux
+        startProcess('xdg-open', [shortcutPath]);
     } else {
         console.error(chalk.red('Sistema operacional não suportado.'));
     }
@@ -134,9 +148,8 @@ app.post('/register', (req, res) => {
     console.log(chalk.green(`WSACTION PREPARADO!`));
 
     setTimeout(() => {
-        restartProcess();  // Reiniciar o processo em vez de fechar
+        restartProcess('Run-Server');  // Reiniciar o processo em vez de fechar
     }, 3000);
-
 });
 
 // Função principal que chama a autenticação e inicializa o servidor se a autenticação for válida
@@ -148,8 +161,16 @@ export default async (IoPort: number) => {
     if (existUser) {
         console.log(chalk.green('Usuário autenticado com sucesso!'));
 
-        await prepareExtensions(user_id as string);
+        // Definir a função reloadModules
+        const reloadModules = () => {
+            // restartProcess();
+        };
 
+        // Passar user_id e reloadModules para prepareExtensions
+        await prepareExtensions(user_id as string, reloadModules);
+
+        // O processo será reiniciado após a atualização das extensões
+        // Portanto, o código abaixo pode não ser executado no processo atual
         const { default: api } = await import('./api');
         await serverInit(IoPort);
 
