@@ -31,6 +31,8 @@ async function initialize() {
     const port = await getValue('servicePort');
     const ip = await getValue('serverIP');
     const delay = await getValue('scriptDelay');
+    const allowedExtensionNames = await getValue('allowedExtensionNames');
+    
 
     // Função para injetar um script externo que define a variável window.identifier
     function injectIdentifierScript() {
@@ -44,7 +46,8 @@ async function initialize() {
                     ip: ip || '127.0.0.1',
                     port: port || 9514,
                     identifier,
-                    delay: delay || 1
+                    delay: delay || 1,
+                    allowedExtensionNames: allowedExtensionNames || []
                 } 
             });
             document.dispatchEvent(event);
@@ -72,6 +75,56 @@ async function initialize() {
             console.error('Erro ao carregar client.js');
         };
     }, delay || 1);
+
+    // Função para escutar mensagens da página web
+    window.addEventListener("message", async function(event) {
+        // Ignora mensagens que não vêm da própria página
+        if (event.source !== window) return;
+        if (event.data && event.data.type === "FROM_WSPAGE") {
+            // Retrieve the list of allowed extension names from storage
+            const allowedExtensions = await getValue('allowedExtensionNames') || [];
+
+            // Ensure that allowedExtensions is an array
+            const extensionsList = Array.isArray(allowedExtensions) ? allowedExtensions : [];
+
+            // Retrieve the extension name from the event data
+            const extensionName = event.data.ext_name;
+
+            // Verify if the extension name is in the allowed list (case-insensitive)
+            const isAllowed = extensionsList.some(
+                (allowedName) => allowedName.toLowerCase() === extensionName.toLowerCase()
+            );
+
+            if (!isAllowed) {
+                console.warn(`${event.data.ext_name} Extension not allowed.`);
+                return
+            }
+
+            // Envia a mensagem para o background script
+            chrome.runtime.sendMessage({
+                action: event.data.action,  // 'open_page', 'change_page' ou 'close_page'
+                url: event.data.url,
+                closeActiveTab: event.data.closeActiveTab,  // Para 'close_page'
+                tabId: event.data.tabId  // Para 'close_page' (opcional)
+            }, function(response) {
+                if (response) {
+                    // Envia uma resposta de volta para a página web
+                    window.postMessage({
+                        type: "FROM_WSACTION_EXTCHROME",
+                        status: response.status,
+                        message: response.message
+                    }, "*");
+                } else {
+                    // Se não houver resposta, enviar erro
+                    window.postMessage({
+                        type: "FROM_WSACTION_EXTCHROME",
+                        status: "error",
+                        message: "Nenhuma resposta recebida da extensão."
+                    }, "*");
+                }
+            });
+        }
+    }, false);
 }
 
 // Inicializar o script

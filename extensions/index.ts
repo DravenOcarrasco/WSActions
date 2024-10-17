@@ -121,8 +121,8 @@ const defineExtensionRoutes = (
     if (!APP) return;
     // Rota para retornar o arquivo client.js
     APP.get(`/ext/${EXT.NAME.replaceAll(' ', '_')}/client`, (req: express.Request, res: express.Response) => {
-        let combinedScript = '';
-        let scripts = EXT.WEB_SCRIPTS ?? ['client.js']
+        let combinedScript = '(function() {\n'; // Início da função anônima
+        let scripts = EXT.WEB_SCRIPTS ?? ['client.js'];
         // Percorre os scripts definidos em EXT.WEB_SCRIPTS
         scripts.forEach((scriptName, index) => {
             const filePath = path.resolve(extensionsPath, BASENAME, scriptName);
@@ -137,6 +137,7 @@ const defineExtensionRoutes = (
     
             // Se for o último arquivo, enviar a resposta concatenada
             if (index === scripts.length - 1) {
+                combinedScript += '})();'; // Encerra a função anônima
                 res.setHeader('Content-Type', 'application/javascript');
                 res.send(combinedScript);
             }
@@ -306,6 +307,7 @@ const registerStorageHandlers = (
     if (!WSIO) return;
 
     WSIO.on('connection', (socket: Socket) => {
+
         socket.on('storage.store', (data) => {
             storageHandlers.save(data);
             socket.emit(data.response, { success: true });

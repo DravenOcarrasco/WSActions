@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,6 +15,23 @@
         #reloadButton {
             display: none;
             margin-top: 20px;
+        }
+        /* Estilização para a lista de permissões */
+        #allowedExtensionsList {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        #allowedExtensionsList li {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        #allowedExtensionsList li span {
+            flex-grow: 1;
+            word-break: break-all;
+        }
+        #allowedExtensionsList li button {
+            margin-left: 10px;
         }
     </style>
 </head>
@@ -54,6 +71,20 @@
             <label for="scriptDelay">Atraso (ms):</label>
             <div class="input-group">
                 <input type="number" class="form-control" id="scriptDelay" min="0" placeholder="Digite o atraso em milissegundos">
+            </div>
+        </div>
+
+        <!-- Campo para gerenciar permissões -->
+        <div class="form-group">
+            <label for="allowedExtensions">Permissões para Controlar (Nomes das Extensões):</label>
+            <ul id="allowedExtensionsList" class="mb-2">
+                <!-- Lista de nomes permitidos será inserida aqui -->
+            </ul>
+            <div class="input-group">
+                <input type="text" class="form-control" id="newExtensionName" placeholder="Digite o nome da extensão">
+                <div class="input-group-append">
+                    <button class="btn btn-primary" id="addExtensionButton" type="button">Adicionar</button>
+                </div>
             </div>
         </div>
 

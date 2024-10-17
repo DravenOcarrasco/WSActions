@@ -179,11 +179,19 @@ function createModuleContext(name) {
         customData[key] = value;
     }
 
+    function sendChromeCommand(data){
+        window.postMessage({
+            ...data,
+            ext_name: name
+        }, "*");
+    }
+
     // Return the context object, which includes methods, properties, and the customData storage
     return {
         MODULE_NAME,
         SOCKET,
         KEYBOARD_COMMANDS,
+        sendChromeCommand,
         setStorage,
         getStorage,
         getVariable,

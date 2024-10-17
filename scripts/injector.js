@@ -41,6 +41,7 @@
                 } else {
                     // Listener para a extensão
                     const listener = (context) => {
+                        console.log(context)
                         if (context.NAME === name) {
                             resolve(context);
                             this.off('extensionLoaded', listener); // Remove o listener após resolver
