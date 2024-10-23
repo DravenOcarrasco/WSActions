@@ -156,10 +156,13 @@ app.post('/register', (req, res) => {
 export default async (IoPort: number) => {
     showHeader();
 
+    console.log(chalk.blue('🔍 Verificando usuário...'));
     const { existUser, user_id } = await authServer();
 
     if (existUser) {
-        console.log(chalk.green('Usuário autenticado com sucesso!'));
+        console.log(chalk.green.bold('✅ Usuário autenticado com sucesso!'));
+        console.log(chalk.blue('🔄 Sincronizando dados...'));
+        console.log(chalk.blue('🔧 Preparando extensões...'));
 
         // Definir a função reloadModules
         const reloadModules = () => {
@@ -169,17 +172,24 @@ export default async (IoPort: number) => {
         // Passar user_id e reloadModules para prepareExtensions
         await prepareExtensions(user_id as string, reloadModules);
 
+        console.log(chalk.green.bold('✅ Extensões carregadas com sucesso!'));
+
         // O processo será reiniciado após a atualização das extensões
         // Portanto, o código abaixo pode não ser executado no processo atual
         const { default: api } = await import('./api');
+        console.log(chalk.blue(`🚀 Iniciando servidor na porta ${chalk.bold(IoPort.toString())}...`));
         await serverInit(IoPort);
 
+        console.log(chalk.green.bold(`✅ Servidor iniciado com sucesso na porta ${chalk.bold(IoPort.toString())}.`));
     } else {
-        console.log(chalk.red('Nenhum usuário registrado. Por favor, registre-se.'));
+        console.log(chalk.red.bold('❌ Nenhum usuário registrado. Por favor, registre-se.'));
 
+        console.log(chalk.blue('🚀 Iniciando servidor de registro na porta 9513...'));
         app.listen(9513, async () => {
-            console.log(chalk.yellow('Servidor API escutando na porta 9513.'));
+            console.log(chalk.green.bold(`✅ Servidor de registro iniciado com sucesso na porta ${chalk.bold('9513')}.`));
+            console.log(chalk.blue('🌐 Abrindo navegador para registro...'));
             openChrome(`${config.dashboard_endpoint}`);
         });
     }
 };
+

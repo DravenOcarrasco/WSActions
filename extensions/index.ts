@@ -31,7 +31,8 @@ interface Extension {
     ROUTER: Router;
     onInitialize: () => void;
     onError?: (error: any) => void;
-    WEB_SCRIPTS: string[]
+    WEB_SCRIPTS: string[],
+    EXTENSION_PATH?: string 
 }
 
 interface Command {
@@ -121,7 +122,7 @@ const defineExtensionRoutes = (
     if (!APP) return;
     // Rota para retornar o arquivo client.js
     APP.get(`/ext/${EXT.NAME.replaceAll(' ', '_')}/client`, (req: express.Request, res: express.Response) => {
-        let combinedScript = '(function() {\n'; // Início da função anônima
+        let combinedScript = '(function() {\n\tconst SHARED_CONTEXT = {};\n'; // Início da função anônima
         let scripts = EXT.WEB_SCRIPTS ?? ['client.js'];
         // Percorre os scripts definidos em EXT.WEB_SCRIPTS
         scripts.forEach((scriptName, index) => {
@@ -208,6 +209,7 @@ const loadExtensionsFromDirectory = (
                     'client.js'
                 ]
             }
+
             let EXT: Extension = {
                 NAME: 'unknown',
                 ENABLED: false,
@@ -215,12 +217,14 @@ const loadExtensionsFromDirectory = (
                 COMMANDS: {},
                 ROUTER: express.Router(),
                 onInitialize: () => {},
-                WEB_SCRIPTS: [] as string[]
+                WEB_SCRIPTS: [] as string[],
+                EXTENSION_PATH: extensionPath
             };
-
+            
             try {
-                EXT = extensionModule(WSIO, APP, RL, { data: STORAGE, save: saveStorage }, expressInstance, WEB_SCRIPTS );
+                EXT = extensionModule(WSIO, APP, RL, { data: STORAGE, save: saveStorage }, expressInstance, WEB_SCRIPTS, extensionPath);
                 if (EXT.ENABLED) {
+                    
                     EXT.onInitialize();
                     EXTENSIONS.ENABLED.push(EXT);
 

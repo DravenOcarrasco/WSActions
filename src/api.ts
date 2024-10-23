@@ -10,6 +10,7 @@ import { cwd } from 'process';
 import { readFile } from 'fs/promises';
 import chalk from 'chalk';  // Usando chalk para colorir o menu
 import ABOUT from './about';
+import { initRelay } from './utils/relay';
 
 const config = loadConfig();
 
@@ -59,6 +60,8 @@ const io = new SocketIoServer(httpServerWS, {
 io.on('connection', (socket) => {
     ModuleController.initIoToSocket(socket);
 });
+
+initRelay(io);
 
 // Iniciando os servidores WebSocket
 httpServerWS.listen(config.http.port, () => {

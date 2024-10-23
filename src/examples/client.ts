@@ -19,11 +19,13 @@ export default function mount(name: string) {
      *   setStorage: (key: string, value: any, isGlobal: boolean) => Promise<object>,
      *   getStorage: (key: string, isGlobal: boolean) => Promise<object>,
      *   getVariable: (variableName: string, defaultValue: any, create: boolean, isGlobal: boolean) => Promise<any>,
-     *   setVariable: (variableName: string, value: any, isGlobal: boolean) => Promise<void>,    // Function to set a variable in local or global storage.
+     *   setVariable: (variableName: string, value: any, isGlobal: boolean) => Promise<void>,
      *   showMenu: (options: Array<object>) => void,
      *   getCustomData: (key: string) => any,
-     *   setCustomData: (key: string, value: any) => void
-     *   setMenuHandler: (handlerFunction: function) => void
+     *   setCustomData: (key: string, value: any) => void,
+     *   setMenuHandler: (handlerFunction: function) => void,
+     *   ioEmit: (eventName: string, data: object) => void,
+     *   register: (CTXAddons?: object) => Promise<void>
      * }} - The context object with methods for WebSocket, storage, and custom data.
     */
     function createContext(moduleName) {
@@ -32,32 +34,66 @@ export default function mount(name: string) {
     
     const CONTEXT = createContext("${name.toUpperCase()}");
     const SOCKET = CONTEXT.SOCKET;
+
+    /**
+     * Define keyboard commands for the module.
+     */
     CONTEXT.KEYBOARD_COMMANDS = [
         {
             description: "Nothing", // Default description
             keys: [{ key: "control", uppercase: false }] // Default key binding
         }
-    ]
+    ];
 
+    /**
+     * Handles WebSocket connection to the server.
+     */
     SOCKET.on('connect', () => {
         console.log(\`\${CONTEXT.MODULE_NAME} Connected to WebSocket server\`);
-
-        SOCKET.on(\`\${CONTEXT.MODULE_NAME}:event\`, (data) => {
-            console.log('Received event:', data);
-        });
+        CONTEXT.ioEmit("join", { MODULE_NAME: CONTEXT.MODULE_NAME });
     });
 
+    /**
+     * Handles WebSocket reconnection to the server.
+     * Re-emits the 'join' event after reconnection.
+     */
+    SOCKET.on('reconnect', (attempt) => {
+        console.log(\`Reconnected to WebSocket server after \${attempt} attempts\`);
+        CONTEXT.ioEmit("join", { MODULE_NAME: CONTEXT.MODULE_NAME });
+    });
+
+    /**
+     * Handles WebSocket disconnection from the server.
+     */
     SOCKET.on('disconnect', () => {
         console.log(\`\${CONTEXT.MODULE_NAME} Disconnected from WebSocket server\`);
     });
 
-    // Register the extension in the global context
-    if (window.WSACTION.CONTEXT_MANAGER) {
-        window.WSACTION.CONTEXT_MANAGER.addExtension(CONTEXT.MODULE_NAME, {
-            location: window.location,
-            ...CONTEXT
-        });   
-    }
+    /**
+     * Example event handler for receiving events from the WebSocket server.
+     */
+    SOCKET.on(\`\$example:event\`, (data) => {
+        console.log('Received event:', data);
+    });
+
+    // Examples of WebSocket events being emitted:
+
+    // Emit a simple event with a message
+    CONTEXT.ioEmit('sendMessage', { message: 'Hello WebSocket!' });
+
+    // Emit an event to update user settings
+    CONTEXT.ioEmit('updateSettings', { theme: 'dark', notifications: true });
+
+    // Emit an event to request data from the server
+    CONTEXT.ioEmit('requestData', { userId: 12345 });
+
+    // Emit an event to notify about a completed task
+    CONTEXT.ioEmit('taskCompleted', { taskId: 7890, status: 'success' });
+
+    /**
+     * Register the module context globally and allow for additional properties via CTXAddons.
+     */
+    await CONTEXT.register();
 })();
     `;
 }

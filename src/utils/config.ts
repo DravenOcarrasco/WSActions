@@ -2,6 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
+interface Relay {
+    enabled: boolean,
+    mode: "master"|"slave",
+    ip: string,
+    port: number
+}
 // Define a interface para a configuração
 interface Config {
     chromeProfilePath: string;
@@ -18,7 +24,8 @@ interface Config {
     dashboard_endpoint: string,
     api_endpoint: string,
     auto_update_extensions: boolean,
-    auto_update_ws_action: boolean
+    auto_update_ws_action: boolean,
+    relay: Relay;
 }
 
 // Obtém o diretório do usuário atual
@@ -40,7 +47,13 @@ const defaultConfig: Config = {
     dashboard_endpoint: "https://wsaction.creativepetabyte.com/sync",
     api_endpoint: "https://wsactionapi.creativepetabyte.com",
     auto_update_extensions: false,
-    auto_update_ws_action: true
+    auto_update_ws_action: true,
+    relay:{
+        ip: "127.0.0.1",
+        port: 9515,
+        enabled: false,
+        mode: "master"
+    }
 };
 
 /**

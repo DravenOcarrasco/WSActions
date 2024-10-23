@@ -166,9 +166,13 @@ const showUpdateMenu = async (extensionName: string, currentVersion: string, new
     return answers.update;
 };
 
+import chalk from 'chalk';
+
 // Função principal para preparar as extensões
 export const prepareExtensions = async (utoken: string, reloadModules: () => void): Promise<void> => {
     try {
+        console.log(chalk.blue('🔍 Verificando extensões ativas...'));
+
         const response = await axios.get<Subscription[]>(`${config.api_endpoint}/api/subscriptions`, {
             headers: { 'x-user-id': utoken },
         });
@@ -184,7 +188,7 @@ export const prepareExtensions = async (utoken: string, reloadModules: () => voi
                     const extensionDir = path.resolve(tempExtensionDir, existingExtension);
                     await zipExtension(extensionDir, existingExtension);
                     rmSync(extensionDir, { recursive: true, force: true });
-                    console.log(`Extensão antiga ${existingExtension} removida.`);
+                    console.log(chalk.yellow(`🗑️ Extensão antiga ${existingExtension} removida.`));
                 }
             }
         } else {
@@ -203,13 +207,13 @@ export const prepareExtensions = async (utoken: string, reloadModules: () => voi
                     const metaData = JSON.parse(readFileSync(metaFilePath, 'utf8'));
                     currentVersion = metaData.version;
                 } else {
-                    console.warn(`Arquivo meta.json não encontrado para a extensão ${extension.name}. Considerando como nova instalação.`);
+                    console.warn(chalk.yellow(`⚠️ Arquivo meta.json não encontrado para a extensão ${extension.name}. Considerando como nova instalação.`));
                 }
             } else {
                 // Se a extensão não está instalada, mas backup existe, restaure
                 const backupZipPath = path.resolve(backupDir, `${extension.name}.zip`);
                 if (existsSync(backupZipPath)) {
-                    console.log(`Restaurando a extensão ${extension.name} a partir do backup.`);
+                    console.log(chalk.blue(`🔄 Restaurando a extensão ${extension.name} a partir do backup.`));
                     await restoreZippedExtension(extension.name, extensionDir);
                     if (existsSync(metaFilePath)) {
                         const metaData = JSON.parse(readFileSync(metaFilePath, 'utf8'));
@@ -224,13 +228,13 @@ export const prepareExtensions = async (utoken: string, reloadModules: () => voi
                 if (isVersionNewer(currentVersion, extension.version)) {
                     if (config.auto_update_extensions) {
                         shouldUpdate = true;
-                        console.log(`Atualizando automaticamente a extensão ${extension.name} para a versão ${extension.version}.`);
+                        console.log(chalk.green(`⬆️ Atualizando automaticamente a extensão ${extension.name} para a versão ${extension.version}.`));
                     } else {
                         const permission = await showUpdateMenu(extension.name, currentVersion, extension.version);
                         shouldUpdate = permission;
                     }
                 } else {
-                    console.log(`A extensão ${extension.name} já está na versão mais recente (${currentVersion}).`);
+                    console.log(chalk.green(`✅ A extensão ${extension.name} já está na versão mais recente (${currentVersion}).`));
                 }
             } else {
                 // Nova instalação
@@ -242,13 +246,13 @@ export const prepareExtensions = async (utoken: string, reloadModules: () => voi
                     // Zipar a extensão atual antes de remover (backup)
                     await zipExtension(extensionDir, extension.name);
                     rmSync(extensionDir, { recursive: true, force: true });
-                    console.log(`Extensão ${extension.name} removida para atualização.`);
+                    console.log(chalk.yellow(`🗑️ Extensão ${extension.name} removida para atualização.`));
                 }
 
                 // Baixa a nova versão
                 const zipFilePath = await downloadExtension(extension);
                 if (!zipFilePath) {
-                    console.error(`Falha ao baixar a extensão ${extension.name}.`);
+                    console.error(chalk.red(`❌ Falha ao baixar a extensão ${extension.name}.`));
                     continue;
                 }
 
@@ -257,7 +261,7 @@ export const prepareExtensions = async (utoken: string, reloadModules: () => voi
 
                 // Remove o arquivo zip baixado
                 rmSync(zipFilePath, { force: true });
-                console.log(`Extensão ${extension.name} instalada/atualizada com sucesso.`);
+                console.log(chalk.green(`✅ Extensão ${extension.name} instalada/atualizada com sucesso.`));
             }
         }
 
@@ -266,12 +270,12 @@ export const prepareExtensions = async (utoken: string, reloadModules: () => voi
         // reloadModules();
 
     } catch (error) {
-        console.error('Erro ao preparar as extensões:', error);
+        console.error(chalk.red('❌ Erro ao preparar as extensões:'), error);
     } finally {
         // Limpa o diretório de downloads temporários
         if (existsSync(tempDir)) {
             rmSync(tempDir, { recursive: true, force: true });
-            console.log(`Diretório temporário ${tempDir} removido.`);
+            console.log(chalk.blue(`🧹 Diretório temporário ${tempDir} removido.`));
         }
     }
 };

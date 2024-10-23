@@ -104,7 +104,8 @@ function createShortcut(
     });
 }
 createShortcut(path.resolve(process.execPath), 'Run-Server', 'server', true)
-createShortcut(path.resolve(process.execPath), 'Open-chrome', 'open-chrome', true)
+createShortcut(path.resolve(process.execPath), 'Open-Chrome', 'open-chrome', true)
+createShortcut(path.resolve(process.execPath), 'Create-Extension', 'create-extension', true)
 
 // Função para criar uma extensão
 async function createExtension(name: string) {

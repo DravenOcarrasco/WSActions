@@ -10,6 +10,14 @@ function createModuleContext(name) {
     // Initialize WebSocket connection using global config
     const SOCKET = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}`, { secure: false });
 
+    SOCKET.on("connect",()=>{
+        SOCKET.emit("join", {MODULE_NAME})
+    })
+
+    SOCKET.on("reconnect", (attempt) => {
+        SOCKET.emit("join", { MODULE_NAME });
+    });
+
     // Default keyboard commands setup (example command)
     const KEYBOARD_COMMANDS = [
         {
@@ -20,6 +28,17 @@ function createModuleContext(name) {
 
     // Custom data object where users can store anything they want
     const customData = {};
+    
+    /**
+     * Emit a WebSocket event with the module's name prefix.
+     * This function ensures that the event name is formatted as `{MODULE_NAME}.evento`.
+     * @param {string} event - The event name (without module prefix).
+     * @param {object} data - The data to be sent with the event.
+     */
+    function ioEmit(event, data) {
+        const eventName = `${MODULE_NAME}.${event}`;  // Format the event name with the module name prefix
+        SOCKET.emit(eventName, data);  // Emit the event via WebSocket
+    }
 
     /**
      * Store data in the module-specific or global storage.
@@ -186,12 +205,12 @@ function createModuleContext(name) {
         }, "*");
     }
 
-    // Return the context object, which includes methods, properties, and the customData storage
-    return {
+    const CONTEXT = {
         MODULE_NAME,
         SOCKET,
         KEYBOARD_COMMANDS,
         sendChromeCommand,
+        ioEmit,
         setStorage,
         getStorage,
         getVariable,
@@ -201,6 +220,20 @@ function createModuleContext(name) {
         setCustomData,    // Store custom data
         setMenuHandler
     };
+
+    const register = async (CTXAddons = {})=>{
+        if (window.WSACTION.CONTEXT_MANAGER) {
+            window.WSACTION.CONTEXT_MANAGER.addExtension(CONTEXT.MODULE_NAME, {
+                location: window.location,
+                ...CONTEXT,
+                ...CTXAddons
+            });   
+        }
+    }
+    
+    CONTEXT.register = register;
+    // Return the context object, which includes methods, properties, and the customData storage
+    return CONTEXT
 }
 
 // Register the function globally on the window object for reuse
