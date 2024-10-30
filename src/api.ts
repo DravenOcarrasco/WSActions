@@ -4,13 +4,13 @@ import path from 'path';
 import { Server as SocketIoServer } from 'socket.io';
 import readline from 'readline';
 import cors from 'cors';
-import ModuleController from '../extensions';  // Verifique se o caminho para este módulo está correto
+import ModuleController from './extenssionLoader';  // Verifique se o caminho para este módulo está correto
 import { loadConfig } from './utils/config';
 import { cwd } from 'process';
 import { readFile } from 'fs/promises';
 import chalk from 'chalk';  // Usando chalk para colorir o menu
 import ABOUT from './about';
-import { initRelay } from './utils/relay';
+import { initRelay } from './modules/relay';
 
 const config = loadConfig();
 

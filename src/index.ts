@@ -1,3 +1,4 @@
+import './utils/customRequire'
 import ChromeManager from './chromeManager';
 import { loadConfig } from './utils/config';
 

@@ -1,9 +1,9 @@
-import { loadConfig } from "./config";
+import { loadConfig } from "../utils/config";
 import { io as SocketIOClient, Socket as ClientSocket } from 'socket.io-client';
 import { createServer, Server as HttpServer } from 'http';
 import { Server as SocketIoServer } from 'socket.io';
-import { createSeparateWebSocketServer } from "../modules/cli-websocket";
-import ModuleController from "../../extensions";
+import { createSeparateWebSocketServer } from "./cli-websocket";
+import ModuleController from "../extenssionLoader";
 import chalk from 'chalk';  // Usando chalk para colorir o menu
 // import ModuleController from './ModuleController'; // Importe a classe de módulo
 

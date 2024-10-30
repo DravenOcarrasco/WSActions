@@ -3,83 +3,11 @@ import path from 'path';
 import express, { Application, Router } from 'express';
 import { Server as SocketIoServer, Socket } from 'socket.io';
 import readline from 'readline';
-import { tempExtensionDir } from '../src/utils/config';
+import { tempExtensionDir } from '../utils/config';
 
 // Definir o diretório de execução
-const execPath = process.execPath;
-
 const extensionsPath = path.resolve(process.cwd(), 'extensions');
 const storagePath = path.resolve(process.cwd(), 'storage.json'); // Caminho para o arquivo de armazenamento
-
-const old = global.require
-//@ts-ignore
-global.require = function (id){
-    const basement_path = `${execPath}/node_modules/`;
-    const file_locale = path.join(basement_path,id);
-    if(old.main?.path.startsWith(process.cwd())) 
-        return old(id);
-
-    if(!fs.existsSync(basement_path)){
-        return old(id);
-    }
-
-    if(fs.existsSync(file_locale)){
-        if(fs.existsSync(path.join(file_locale, 'package.json'))) {
-            const pkg_json = JSON.parse(fs.readFileSync(path.join(file_locale, 'package.json'),  { encoding:"utf-8" }));
-            if(pkg_json?.main) {
-                return old(path.join(file_locale,pkg_json?.main))
-            } else if(pkg_json?.module) {
-                return old(path.join(file_locale,pkg_json?.module))
-            } else if(pkg_json?.exports) {
-                if(pkg_json?.exports['.']) {
-                    if(pkg_json?.exports['.']?.require) {
-                        return old(path.join(file_locale,pkg_json?.exports['.']?.require))
-                    } else if(pkg_json?.exports['.']?.import) {
-                        return old(path.join(file_locale,pkg_json?.exports['.']?.import))
-                    }
-                } else {
-                    throw new Error("Module not detect or not found, check package.json of node_modules");
-                }
-            } else {
-                throw new Error("Module not detect or not found, check package.json of node_modules");
-            }
-        } else {
-            if(
-                file_locale.endsWith('.js')||
-                file_locale.endsWith('.cjs')||
-                file_locale.endsWith('.mjs')||
-                file_locale.endsWith('.cts')||
-                file_locale.endsWith('.mts')||
-                file_locale.endsWith('.jsx')||
-                file_locale.endsWith('.tsx')
-            ) {
-                return old(file_locale);
-            } else {
-                // é um repositorio mais possivelmente é um index
-                const data = fs.readdirSync(file_locale);
-                
-                if(!data.length) {
-                    throw new Error("Module not detect or not found, check package.json of node_modules");
-                }
-
-                let _founded_true_filepath = null;
-                data.forEach(filepath => {
-                    if(filepath.split("/").pop()?.startsWith("index")) {
-                        _founded_true_filepath = filepath;
-                    }
-                })
-                
-                if(!_founded_true_filepath) {
-                    throw new Error("Module not detect or not found, check package.json of node_modules");
-                }
-                return old(_founded_true_filepath);
-            }
-        }
-    } else {
-         // possivelmente é um modulo virtual
-         return old(id);
-    }
-}
 
 // Verificar se a pasta de extensões temporárias existe, se não, criar
 if (!fs.existsSync(tempExtensionDir)) {
@@ -99,7 +27,8 @@ interface Extension {
     onInitialize: () => void;
     onError?: (error: any) => void;
     WEB_SCRIPTS: string[],
-    EXTENSION_PATH?: string
+    EXTENSION_PATH?: string,
+    ID: string
 }
 
 interface Command {
@@ -189,7 +118,7 @@ const defineExtensionRoutes = (
     if (!APP) return;
     // Rota para retornar o arquivo client.js
     APP.get(`/ext/${EXT.NAME.replaceAll(' ', '_')}/client`, (req: express.Request, res: express.Response) => {
-        let combinedScript = '(function() {\n\tconst SHARED_CONTEXT = {};\n'; // Início da função anônima
+        let combinedScript = `(function() {\n    const SHARED_CONTEXT = {};\n    const EXTENSION_ID = '${EXT.ID}';\n`; // Início da função anônima
         let scripts = EXT.WEB_SCRIPTS ?? ['client.js'];
         // Percorre os scripts definidos em EXT.WEB_SCRIPTS
         scripts.forEach((scriptName, index) => {
@@ -252,90 +181,124 @@ const loadExtensionsFromDirectory = (
         const extensionPath = path.join(directoryPath, extensionDir);
         const metaPath = path.join(extensionPath, "meta.json");
 
-        if (fs.statSync(extensionPath).isDirectory() && fs.existsSync(metaPath)) {
-            const extensionModule = require(extensionPath);
+        if (isDirectoryWithMeta(extensionPath, metaPath)) {
             const BASENAME = path.basename(extensionPath);
-
-            if (typeof extensionModule !== 'function') {
-                console.error(`Extensão inválida: ${extensionDir}`);
-                return;
-            }
-            let WEB_SCRIPTS = [
-                'client.js'
-            ]
+            const extensionModule = requireExtensionModule(extensionPath, extensionDir);
+        
+            if (!extensionModule) return;
+        
+            const metadata = loadMetaData(metaPath);
+            const WEB_SCRIPTS = metadata?.WEB_SCRIPTS || ['client.js'];
+            let extension = createDefaultExtension(extensionPath);
+        
+            // Primeira tentativa de carregar a extensão com a nova estrutura de parâmetros
             try {
-                const META_JSON = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-                WEB_SCRIPTS = META_JSON?.WEB_SCRIPTS
-                if (!WEB_SCRIPTS) {
-                    WEB_SCRIPTS = [
-                        'client.js'
-                    ]
-                }
-            } catch {
-                WEB_SCRIPTS = [
-                    'client.js'
-                ]
-            }
-
-            let EXT: Extension = {
-                NAME: 'unknown',
-                ENABLED: false,
-                IOEVENTS: {},
-                COMMANDS: {},
-                ROUTER: express.Router(),
-                onInitialize: () => { },
-                WEB_SCRIPTS: [] as string[],
-                EXTENSION_PATH: extensionPath
-            };
-
-            try {
-                EXT = extensionModule(WSIO, APP, RL, { data: STORAGE, save: saveStorage }, expressInstance, WEB_SCRIPTS, extensionPath);
-                if (EXT.ENABLED) {
-
-                    EXT.onInitialize();
-                    EXTENSIONS.ENABLED.push(EXT);
-
-                    // Criar registro no armazenamento para a extensão
-                    if (!STORAGE[EXT.NAME]) {
-                        STORAGE[EXT.NAME] = {};
-                    }
-
-                    // Configurar comandos CLI
-                    if (EXT.COMMANDS) {
-                        for (const [event, handler] of Object.entries(EXT.COMMANDS)) {
-                            WSIO?.on(`${EXT.NAME}.${event}`, handler._function);
-                            if (!COMMANDS.CLI[EXT.NAME]) {
-                                COMMANDS.CLI[EXT.NAME] = {} as Record<string, Command>;
-                            }
-                            COMMANDS.CLI[EXT.NAME][event] = handler;
-                        }
-                    }
-
-                    // Configurar eventos IO
-                    if (EXT.IOEVENTS) {
-                        for (const [event, handler] of Object.entries(EXT.IOEVENTS)) {
-                            if (!COMMANDS.IO[EXT.NAME]) {
-                                COMMANDS.IO[EXT.NAME] = {} as Record<string, Command>;
-                            }
-                            COMMANDS.IO[EXT.NAME][event] = handler;
-                        }
-                    }
-                } else {
-                    EXTENSIONS.DISABLED.push(EXT);
-                }
-
-                // Define as rotas para a extensão
-                defineExtensionRoutes(APP, EXT, directoryPath, BASENAME);
-            } catch (error) {
-                console.error(`Erro ao carregar extensão ${extensionDir}: ${error}`);
-                EXT.ENABLED = false;
-                EXTENSIONS.DISABLED.push(EXT);
-                if (EXT.onError) {
-                    EXT.onError(error);
+                extension = extensionModule({
+                    WSIO, 
+                    APP, 
+                    RL, 
+                    STORAGE: { data: STORAGE, save: saveStorage },
+                    EXPRESS: expressInstance, 
+                    WEB_SCRIPTS, 
+                    EXTENSION_PATH: extensionPath,
+                    ID: metadata.id!
+                });
+                processExtension(extension, EXTENSIONS, STORAGE, COMMANDS, WSIO);
+                defineExtensionRoutes(APP, extension, directoryPath, BASENAME);
+            } catch (error: any) {
+                console.warn(`Tentativa de carregamento da extensão com o novo formato falhou. Tentando em modo de compatibilidade.`);
+        
+                // Modo de compatibilidade (segunda tentativa)
+                try {
+                    extension = extensionModule(WSIO, APP, RL, { data: STORAGE, save: saveStorage }, expressInstance, WEB_SCRIPTS, extensionPath);
+                    processExtension(extension, EXTENSIONS, STORAGE, COMMANDS, WSIO);
+                    defineExtensionRoutes(APP, extension, directoryPath, BASENAME);
+                } catch (compatError: any) {
+                    handleExtensionError(extension, EXTENSIONS, extensionDir, compatError);
                 }
             }
         }
     });
+};
+
+// Funções auxiliares para simplificar o código
+
+const isDirectoryWithMeta = (extensionPath: string, metaPath: string): boolean =>
+    fs.statSync(extensionPath).isDirectory() && fs.existsSync(metaPath);
+
+const requireExtensionModule = (extensionPath: string, extensionDir: string) => {
+    try {
+        const module = require(extensionPath);
+        if (typeof module !== 'function') {
+            console.error(`Extensão inválida: ${extensionDir}`);
+            return null;
+        }
+        return module;
+    } catch (error) {
+        console.error(`Erro ao carregar módulo de extensão ${extensionDir}: ${error}`);
+        return null;
+    }
+};
+
+const loadMetaData = (file_path: string)=>{
+    try {
+        const META_JSON = JSON.parse(fs.readFileSync(file_path, 'utf-8'));
+        return META_JSON;
+    } catch {
+        return {};
+    }
+}
+
+const createDefaultExtension = (extensionPath: string): Extension => ({
+    NAME: 'unknown',
+    ENABLED: false,
+    IOEVENTS: {},
+    COMMANDS: {},
+    ROUTER: express.Router(),
+    onInitialize: () => { },
+    WEB_SCRIPTS: [],
+    EXTENSION_PATH: extensionPath,
+    ID: ""
+});
+
+const processExtension = (extension: Extension, EXTENSIONS: { ENABLED: Extension[], DISABLED: Extension[] }, STORAGE: Record<string, any>, COMMANDS: Commands, WSIO: SocketIoServer | null) => {
+    if (extension.ENABLED) {
+        extension.onInitialize();
+        EXTENSIONS.ENABLED.push(extension);
+        STORAGE[extension.NAME] ||= {};
+
+        if (extension.COMMANDS) {
+            configureCommands(extension, COMMANDS, WSIO);
+        }
+
+        if (extension.IOEVENTS) {
+            configureIOEvents(extension, COMMANDS);
+        }
+    } else {
+        EXTENSIONS.DISABLED.push(extension);
+    }
+};
+
+const configureCommands = (extension: Extension, COMMANDS: Commands, WSIO: SocketIoServer | null) => {
+    for (const [event, handler] of Object.entries(extension.COMMANDS)) {
+        WSIO?.on(`${extension.NAME}.${event}`, handler._function);
+        COMMANDS.CLI[extension.NAME] ||= {};
+        COMMANDS.CLI[extension.NAME][event] = handler;
+    }
+};
+
+const configureIOEvents = (extension: Extension, COMMANDS: Commands) => {
+    for (const [event, handler] of Object.entries(extension.IOEVENTS)) {
+        COMMANDS.IO[extension.NAME] ||= {};
+        COMMANDS.IO[extension.NAME][event] = handler;
+    }
+};
+
+const handleExtensionError = (extension: Extension, EXTENSIONS: { ENABLED: Extension[], DISABLED: Extension[] }, extensionDir: string, error: Error) => {
+    console.error(`Erro ao carregar extensão ${extensionDir}: ${error}`);
+    extension.ENABLED = false;
+    EXTENSIONS.DISABLED.push(extension);
+    extension.onError?.(error);
 };
 
 /**
@@ -487,11 +450,19 @@ const ModuleController = (() => {
      * @param socket - Instância do Socket
      */
     function initIoToSocket(socket: Socket) {
+        // Obtenha o `id` e `moduleName` do handshake
+        var { id } = socket.handshake.query;
+        if(!id || id === ""){
+            id = "ALL"
+        }
+        // Inicializa os eventos IO específicos para o socket
         EXTENSIONS.ENABLED.forEach(EXT => {
             Object.entries(EXT.IOEVENTS).forEach(([event, handler]) => {
                 socket.on(`${EXT.NAME}.${event}`, handler._function);
             });
         });
+
+        socket.join(id as string)
     }
 
     return {

@@ -3,12 +3,12 @@
  * @param {string} name - The name of the module.
  * @returns {object} - The context object with methods for WebSocket, storage, and custom data.
  */
-function createModuleContext(name) {
+function createModuleContext(name, ID ="ALL") {
     // The module name in uppercase
     const MODULE_NAME = name.toUpperCase();
-
-    // Initialize WebSocket connection using global config
-    const SOCKET = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}`, { secure: false });
+        secure: false,
+        query: { id: ID , moduleName: MODULE_NAME }
+    });
 
     SOCKET.on("connect",()=>{
         SOCKET.emit("join", {MODULE_NAME})

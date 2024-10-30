@@ -11,7 +11,7 @@ import chalk from 'chalk';
 import figlet from 'figlet';
 import ABOUT from './about';
 import path from 'path';
-import extensions from '../extensions';
+import extensions from './extenssionLoader';
 
 const app = express();
 app.use(express.json());

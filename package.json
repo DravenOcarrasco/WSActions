@@ -1,8 +1,8 @@
 {
   "name": "wsaction",
   "version": "2.7.4",
-  "main": "tsc-build/src/index.js",
-  "bin": "tsc-build/src/index.js",
+  "main": "tsc-build/index.js",
+  "bin": "tsc-build/index.js",
   "scripts": {
     "build": "tsc",
     "nexe-build": "nexe -t windows-x64-22.0.0 ./src/index.ts -o ./dist/WSActions.exe --resources ./node_modules/puppeteer/**/* --resources ./assets/**/* --rc-CompanyName='Sua Empresa' --rc-FileDescription='WSActions - Gerenciador de ações da web' --rc-ProductName='WSActions'",
