@@ -6,6 +6,8 @@
 function createModuleContext(name, ID ="ALL") {
     // The module name in uppercase
     const MODULE_NAME = name.toUpperCase();
+    // Initialize WebSocket connection using global config, with `id` as a query parameter
+    const SOCKET = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}`, {
         secure: false,
         query: { id: ID , moduleName: MODULE_NAME }
     });
