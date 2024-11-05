@@ -4,95 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WSActions</title>
-    <link rel="stylesheet" href="libs/css/bootstrap.min.css">
+    <link rel="stylesheet" href="libs/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" type="text/css" href="styles.css">
-    <style>
-        body {
-            background-color: #f8f9fa;
-        }
-        .device-id {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background-color: #ffffff;
-            padding: 10px 15px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-        }
-        #reloadButton {
-            display: none;
-            margin-top: 20px;
-        }
-        /* Estilização para a lista de permissões usando List Group */
-        #allowedExtensionsList {
-            list-style-type: none;
-            padding-left: 0;
-        }
-        .list-group-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background-color: #ffffff;
-            border: 1px solid #e9ecef;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            transition: background-color 0.3s ease;
-        }
-        .list-group-item:hover {
-            background-color: #f1f1f1;
-        }
-        .extension-name {
-            flex-grow: 1;
-            margin-right: 15px;
-            word-break: break-all;
-        }
-        .remove-extension-btn {
-            color: #dc3545;
-            border: none;
-            background: none;
-            cursor: pointer;
-            transition: color 0.3s ease;
-        }
-        .remove-extension-btn:hover {
-            color: #a71d2a;
-        }
-        /* Status de conexão */
-        .status-connected {
-            color: #28a745;
-            font-weight: bold;
-        }
-        .status-disconnected {
-            color: #dc3545;
-            font-weight: bold;
-        }
-        /* Posicionamento do status */
-        .status-container {
-            display: flex;
-            align-items: center;
-        }
-        .status-container i {
-            margin-right: 5px;
-        }
-        /* Feedback de validação */
-        .invalid-feedback {
-            display: none;
-            color: #dc3545;
-        }
-        .is-invalid + .invalid-feedback {
-            display: block;
-        }
-        /* Ajuste de altura consistente para os campos */
-        .input-group-text, .form-control {
-            height: 100%;
-        }
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-    </style>
 </head>
 <body>
     <div class="container py-4">
@@ -107,88 +21,125 @@
             <hr>
         </div>
 
-        <!-- Configurações -->
-        <div>
-            <!-- Primeira Linha: IP do Host e Porta -->
-            <div class="row align-items-center mb-3">
-                <!-- IP do Host -->
-                <div class="col-sm-12 col-md-6 mb-3 mb-md-0">
-                    <label for="serverIP"><i class="fas fa-network-wired"></i> IP do Host:</label>
-                    <div class="input-group">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text"><i class="fas fa-server"></i></span>
-                        </div>
-                        <input type="text" class="form-control" id="serverIP" placeholder="Digite o IP do host">
-                    </div>
-                </div>
+        <!-- Nav Tabs -->
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="app-tab" data-bs-toggle="tab" href="#app" role="tab" aria-controls="app" aria-selected="true">
+                    <i class="fas fa-cog"></i> Config
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="proxy-tab" data-bs-toggle="tab" href="#proxy" role="tab" aria-controls="proxy" aria-selected="false">
+                    <i class="fas fa-network-wired"></i> Proxy
+                </a>
+            </li>
+        </ul>
 
-                <!-- Porta do Serviço -->
-                <div class="col-sm-12 col-md-6">
-                    <label for="servicePort"><i class="fas fa-network-wired"></i> Porta:</label>
-                    <div class="input-group">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text"><i class="fas fa-exchange-alt"></i></span>
+        <!-- Tab Content -->
+        <div class="tab-content" id="myTabContent">
+            <!-- App Principal Tab -->
+            <div class="tab-pane fade show active" id="app" role="tabpanel" aria-labelledby="app-tab">
+                <div>
+                    <!-- Primeira Linha: IP do Host e Porta -->
+                    <div class="row align-items-center mb-3">
+                        <div class="col-sm-12 col-md-6 mb-3 mb-md-0">
+                            <label for="serverIP"><i class="fas fa-network-wired"></i> IP do Host:</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-server"></i></span>
+                                </div>
+                                <input type="text" class="form-control" id="serverIP" placeholder="Digite o IP do host">
+                            </div>
                         </div>
-                        <input type="number" class="form-control" id="servicePort" min="1" max="65535" placeholder="Digite a porta do serviço">
+                        <div class="col-sm-12 col-md-6">
+                            <label for="servicePort"><i class="fas fa-network-wired"></i> Porta:</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-exchange-alt"></i></span>
+                                </div>
+                                <input type="number" class="form-control" id="servicePort" min="1" max="65535" placeholder="Digite a porta do serviço">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Segunda Linha: Identificador e Atraso -->
+                    <div class="row align-items-center mb-3">
+                        <div class="col-sm-12 col-md-6 mb-3 mb-md-0">
+                            <label for="identifier"><i class="fas fa-id-badge"></i> Identificador:</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-key"></i></span>
+                                </div>
+                                <input type="text" class="form-control" id="identifier" placeholder="Digite o identificador">
+                            </div>
+                        </div>
+                        <div class="col-sm-12 col-md-6">
+                            <label for="scriptDelay"><i class="fas fa-clock"></i> Atraso (ms):</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-stopwatch"></i></span>
+                                </div>
+                                <input type="number" class="form-control" id="scriptDelay" min="0" placeholder="Digite o atraso em milissegundos">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Permissões para Controlar Extensões -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label for="allowedExtensions"><i class="fas fa-lock"></i> ALLOW CHROME CONTROLL</label>
+                            <ul id="allowedExtensionsList" class="list-group mb-3">
+                                <!-- Lista de nomes permitidos será inserida aqui -->
+                            </ul>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="newExtensionName" placeholder="Digite o nome da extensão" aria-describedby="addExtensionButton">
+                                <div class="input-group-append">
+                                    <button class="btn btn-primary" id="addExtensionButton" type="button"><i class="fas fa-plus"></i> Adicionar</button>
+                                </div>
+                            </div>
+                            <div class="invalid-feedback" id="extensionError">Este nome de extensão já está na lista ou é inválido.</div>
+                        </div>
+                    </div>
+
+                    <!-- Status da Conexão -->
+                    <div class="row mb-3">
+                        <div class="col-12 status-container">
+                            <i class="fas fa-signal"></i>
+                            <label for="status" class="mb-0">Status:</label>
+                            <p id="status" class="mb-0 status-disconnected ml-2"><i class="fas fa-times-circle"></i> Desconectado</p>
+                        </div>
+                    </div>
+
+                    <!-- Botão para Recarregar a Página -->
+                    <div class="row">
+                        <div class="col-12">
+                            <button id="reloadButton" class="btn btn-secondary btn-block"><i class="fas fa-sync-alt"></i> Recarregar</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Segunda Linha: Identificador e Atraso -->
-            <div class="row align-items-center mb-3">
-                <!-- Identificador -->
-                <div class="col-sm-12 col-md-6 mb-3 mb-md-0">
-                    <label for="identifier"><i class="fas fa-id-badge"></i> Identificador:</label>
-                    <div class="input-group">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text"><i class="fas fa-key"></i></span>
-                        </div>
-                        <input type="text" class="form-control" id="identifier" placeholder="Digite o identificador">
-                    </div>
-                </div>
+            <!-- Configuração de Proxy Tab -->
+            <div class="tab-pane fade" id="proxy" role="tabpanel" aria-labelledby="proxy-tab">
+                <label for="proxyMode">Modo de Proxy:</label>
+                <select id="proxyMode" class="form-control">
+                    <option value="auto">Automático</option>
+                    <option value="http">HTTP</option>
+                    <option value="https">HTTPS</option>
+                </select>
 
-                <!-- Atraso do Script -->
-                <div class="col-sm-12 col-md-6">
-                    <label for="scriptDelay"><i class="fas fa-clock"></i> Atraso (ms):</label>
-                    <div class="input-group">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text"><i class="fas fa-stopwatch"></i></span>
+                <!-- Campos para configuração manual de proxy -->
+                <div id="manualProxyConfig" style="display: none; margin-top: 15px;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="proxyIP">IP do Proxy:</label>
+                            <input type="text" id="proxyIP" class="form-control" placeholder="Digite o IP do proxy">
                         </div>
-                        <input type="number" class="form-control" id="scriptDelay" min="0" placeholder="Digite o atraso em milissegundos">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Permissões para Controlar Extensões -->
-            <div class="row mb-3">
-                <div class="col-12">
-                    <label for="allowedExtensions"><i class="fas fa-lock"></i> ALLOW CHROME CONTROLL</label>
-                    <ul id="allowedExtensionsList" class="list-group mb-3">
-                        <!-- Lista de nomes permitidos será inserida aqui -->
-                    </ul>
-                    <div class="input-group">
-                        <input type="text" class="form-control" id="newExtensionName" placeholder="Digite o nome da extensão" aria-describedby="addExtensionButton">
-                        <div class="input-group-append">
-                            <button class="btn btn-primary" id="addExtensionButton" type="button"><i class="fas fa-plus"></i> Adicionar</button>
+                        <div class="col-md-6">
+                            <label for="proxyPort">Porta:</label>
+                            <input type="number" id="proxyPort" class="form-control" placeholder="Digite a porta">
                         </div>
                     </div>
-                    <div class="invalid-feedback" id="extensionError">Este nome de extensão já está na lista ou é inválido.</div>
-                </div>
-            </div>
-
-            <!-- Status da Conexão -->
-            <div class="row mb-3">
-                <div class="col-12 status-container">
-                    <i class="fas fa-signal"></i>
-                    <label for="status" class="mb-0">Status:</label>
-                    <p id="status" class="mb-0 status-disconnected ml-2"><i class="fas fa-times-circle"></i> Desconectado</p>
-                </div>
-            </div>
-
-            <!-- Botão para Recarregar a Página -->
-            <div class="row">
-                <div class="col-12">
-                    <button id="reloadButton" class="btn btn-secondary btn-block"><i class="fas fa-sync-alt"></i> Recarregar</button>
                 </div>
             </div>
         </div>
@@ -196,7 +147,7 @@
 
     <!-- Scripts -->
     <script src="libs/jquery-3.5.1.min.js"></script>
-    <script src="libs/js/bootstrap.min.js"></script>
+    <script src="libs/bootstrap.bundle.min.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>

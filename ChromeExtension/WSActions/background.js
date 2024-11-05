@@ -14,6 +14,50 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
     return true; // Permitir resposta assíncrona
 });
 
+chrome.runtime.onStartup.addListener(initializeProxy);
+// Listener para alterações de configuração de proxy
+chrome.storage.onChanged.addListener((changes) => {
+    if (changes.proxyMode || changes.proxyIP || changes.proxyPort) {
+        setProxyConfig();
+    }
+});
+
+// Função para definir o proxy com base no modo selecionado
+function setProxyConfig() {
+    chrome.storage.local.get(['proxyMode', 'proxyIP', 'proxyPort'], (prefs) => {
+        if (prefs.proxyMode === 'auto') {
+            // Modo automático
+            chrome.proxy.settings.set({ value: { mode: 'auto_detect' } });
+        } else if (prefs.proxyMode === 'http' || prefs.proxyMode === 'https') {
+            // Modo manual (HTTP ou HTTPS)
+            const scheme = prefs.proxyMode === 'http' ? 'http' : 'https';
+            const proxyConfig = {
+                mode: 'fixed_servers',
+                rules: {
+                    singleProxy: {
+                        scheme: scheme,
+                        host: prefs.proxyIP,
+                        port: parseInt(prefs.proxyPort)
+                    },
+                    bypassList: ["<local>"]
+                }
+            };
+
+            chrome.proxy.settings.set({ value: proxyConfig }, () => {
+                if (chrome.runtime.lastError) {
+                    console.error('Erro ao configurar proxy:', chrome.runtime.lastError);
+                } else {
+                    console.log('Proxy configurado:', proxyConfig);
+                }
+            });
+        }
+    });
+}
+
+function initializeProxy() {
+    setProxyConfig();
+}
+
 /**
  * Função para tratar diferentes tipos de ações de mensagens
  */
@@ -156,4 +200,21 @@ function normalizeURL(url) {
     } catch (_) {
         return url;
     }
+}
+
+// Função para configurar o proxy com base nas preferências
+function setProxyMode(mode, pacScriptUrl = null) {
+    let proxyConfig = { mode };
+
+    if (mode === 'pac_script' && pacScriptUrl) {
+        proxyConfig.pacScript = { url: pacScriptUrl };
+    }
+
+    chrome.proxy.settings.set({ value: proxyConfig, scope: 'regular' }, () => {
+        if (chrome.runtime.lastError) {
+            console.error('Erro ao configurar proxy:', chrome.runtime.lastError);
+        } else {
+            console.log('Proxy configurado:', proxyConfig);
+        }
+    });
 }

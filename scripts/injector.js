@@ -37,23 +37,43 @@
             this.events[event].forEach(listener => listener(data));
         },
 
-        // Função para aguardar uma extensão ser adicionada
-        awaitExtension(name) {
-            return new Promise((resolve) => {
-                // Verifica se a extensão já foi carregada
+        // Função para aguardar uma extensão ser adicionada com timeout e loop de verificação
+        awaitExtension(name, timeout = 5000) {
+            return new Promise((resolve, reject) => {
+                // Verifica se a extensão já foi carregada antes de iniciar o loop
                 if (this.extensions[name]) {
-                    resolve(this.extensions[name]);
-                } else {
-                    // Listener para a extensão
-                    const listener = (context) => {
-                        if (context.NAME === name) {
-                            resolve(context);
-                            this.off('extensionLoaded', listener); // Remove o listener após resolver
-                        }
-                    };
-                    // Escuta o evento 'extensionLoaded'
-                    this.on('extensionLoaded', listener);
+                    return resolve(this.extensions[name]);
                 }
+
+                // Define a função de timeout
+                const timeoutId = setTimeout(() => {
+                    clearInterval(checkInterval); // Limpa o intervalo no caso de timeout
+                    this.off('extensionLoaded', listener); // Remove o listener em caso de timeout
+                    reject(new Error(`Timeout: A extensão "${name}" não foi carregada dentro do tempo limite de ${timeout}ms.`));
+                }, timeout);
+
+                // Listener para capturar o evento 'extensionLoaded'
+                const listener = (context) => {
+                    if (context.NAME === name) {
+                        clearTimeout(timeoutId); // Limpa o timeout se a extensão for carregada
+                        clearInterval(checkInterval); // Limpa o intervalo ao encontrar a extensão
+                        resolve(context);
+                        this.off('extensionLoaded', listener); // Remove o listener após resolver
+                    }
+                };
+
+                // Escuta o evento 'extensionLoaded'
+                this.on('extensionLoaded', listener);
+
+                // Loop de verificação a cada 100ms para monitorar o carregamento da extensão
+                const checkInterval = setInterval(() => {
+                    if (this.extensions[name]) {
+                        clearTimeout(timeoutId); // Limpa o timeout se a extensão for encontrada
+                        clearInterval(checkInterval); // Limpa o intervalo ao encontrar a extensão
+                        resolve(this.extensions[name]);
+                        this.off('extensionLoaded', listener); // Remove o listener, pois a extensão foi encontrada
+                    }
+                }, 100); // Verifica a cada 100ms
             });
         },
 

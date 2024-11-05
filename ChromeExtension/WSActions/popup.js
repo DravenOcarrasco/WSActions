@@ -139,7 +139,7 @@ function createExtensionListItem(extensionName) {
     span.textContent = extensionName;
 
     const removeButton = document.createElement('button');
-    removeButton.className = 'btn btn-danger btn-sm';
+    removeButton.className = 'btn btn-danger btn-sm m-2';
     removeButton.type = 'button';
     removeButton.textContent = 'Remover';
     removeButton.addEventListener('click', () => {
@@ -180,6 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeInputListeners();
     initializeStoredValues();
     initializeButtons();
+    initializePopup();
 });
 
 // Inicializa o identificador
@@ -302,4 +303,37 @@ function initializeButtons() {
             this.style.display = 'none';
         }
     });
+}
+
+function initializePopup() {
+    const proxyModeSelect = document.getElementById('proxyMode');
+    const manualProxyConfig = document.getElementById('manualProxyConfig');
+
+    proxyModeSelect.addEventListener('change', function () {
+        const selectedMode = proxyModeSelect.value;
+
+        // Mostrar ou ocultar a configuração manual do proxy
+        manualProxyConfig.style.display = selectedMode === 'http' || selectedMode === 'https' ? 'block' : 'none';
+
+        // Salvar o modo de proxy
+        chrome.storage.local.set({ proxyMode: selectedMode });
+    });
+
+    document.getElementById('proxyIP').addEventListener('input', saveManualProxyConfig);
+    document.getElementById('proxyPort').addEventListener('input', saveManualProxyConfig);
+
+    // Carregar configurações do storage
+    chrome.storage.local.get(['proxyMode', 'proxyIP', 'proxyPort'], (prefs) => {
+        proxyModeSelect.value = prefs.proxyMode || 'auto';
+        document.getElementById('proxyIP').value = prefs.proxyIP || '';
+        document.getElementById('proxyPort').value = prefs.proxyPort || '';
+        manualProxyConfig.style.display = proxyModeSelect.value === 'http' || proxyModeSelect.value === 'https' ? 'block' : 'none';
+    });
+}
+
+function saveManualProxyConfig() {
+    const proxyIP = document.getElementById('proxyIP').value;
+    const proxyPort = document.getElementById('proxyPort').value;
+
+    chrome.storage.local.set({ proxyIP, proxyPort });
 }

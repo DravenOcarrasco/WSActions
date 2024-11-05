@@ -19,14 +19,13 @@ export default function mount(name: string) {
      * @returns {{
      *   MODULE_NAME: string,
      *   SOCKET: object,
+     *   PUBLIC: Object,
      *   KEYBOARD_COMMANDS: Array<object>,
      *   setStorage: (key: string, value: any, isGlobal: boolean) => Promise<object>,
      *   getStorage: (key: string, isGlobal: boolean) => Promise<object>,
      *   getVariable: (variableName: string, defaultValue: any, create: boolean, isGlobal: boolean) => Promise<any>,
      *   setVariable: (variableName: string, value: any, isGlobal: boolean) => Promise<void>,
      *   showMenu: (options: Array<object>) => void,
-     *   getCustomData: (key: string) => any,
-     *   setCustomData: (key: string, value: any) => void,
      *   setMenuHandler: (handlerFunction: function) => void,
      *   ioEmit: (eventName: string, data: object) => void,
      *   register: (CTXAddons?: object) => Promise<void>

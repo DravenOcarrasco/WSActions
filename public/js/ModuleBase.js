@@ -29,7 +29,7 @@ function createModuleContext(name, ID ="ALL") {
     ];
 
     // Custom data object where users can store anything they want
-    const customData = {};
+    const PUBLIC = {}
     
     /**
      * Emit a WebSocket event with the module's name prefix.
@@ -182,24 +182,6 @@ function createModuleContext(name, ID ="ALL") {
         }
     }
 
-    /**
-     * Get custom data stored by the user.
-     * @param {string} key - The key to retrieve custom data for.
-     * @returns {any} - The value of the custom data, or undefined if not set.
-     */
-    function getCustomData(key) {
-        return customData[key];
-    }
-
-    /**
-     * Set custom data by the user.
-     * @param {string} key - The key to store custom data under.
-     * @param {any} value - The value to store.
-     */
-    function setCustomData(key, value) {
-        customData[key] = value;
-    }
-
     function sendChromeCommand(data){
         window.postMessage({
             ...data,
@@ -211,6 +193,7 @@ function createModuleContext(name, ID ="ALL") {
         MODULE_NAME,
         SOCKET,
         KEYBOARD_COMMANDS,
+        PUBLIC,
         sendChromeCommand,
         ioEmit,
         setStorage,
@@ -218,8 +201,6 @@ function createModuleContext(name, ID ="ALL") {
         getVariable,
         setVariable,
         showMenu,
-        getCustomData,   // Access custom data
-        setCustomData,    // Store custom data
         setMenuHandler
     };
 
