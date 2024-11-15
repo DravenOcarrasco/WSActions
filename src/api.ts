@@ -1,15 +1,16 @@
 import express, { Application } from 'express';
 import http from 'http';
 import path from 'path';
-import { Server as SocketIoServer, Socket } from 'socket.io';
+import { Server as SocketIoServer } from 'socket.io';
 import readline from 'readline';
 import cors from 'cors';
-import ModuleController from '../extensions';  // Verifique se o caminho para este módulo está correto
-import { loadConfig } from './config';
+import ModuleController from './extenssionLoader';  // Verifique se o caminho para este módulo está correto
+import { loadConfig } from './utils/config';
 import { cwd } from 'process';
 import { readFile } from 'fs/promises';
-
-import ABOUT from './about'
+import chalk from 'chalk';  // Usando chalk para colorir o menu
+import ABOUT from './about';
+import { initRelay } from './modules/relay';
 
 const config = loadConfig();
 
@@ -18,7 +19,7 @@ const execPath = process.execPath;
 const execDir = execPath.includes("bun.exe") || execPath.includes("node.exe")
     ? path.dirname(__dirname)
     : path.dirname(execPath);
-console.log(`EXT_PATH: ${path.resolve(execDir, 'extensions')}`);
+// console.log(chalk.blue(`EXT_PATH: ${path.resolve(execDir, 'extensions')}`));
 
 // Inicializando o Express
 const app: Application = express();
@@ -56,19 +57,15 @@ const io = new SocketIoServer(httpServerWS, {
     }
 });
 
-const connectedClients = new Set<Socket>(); // Usando Set para armazenar clientes conectados
-
 io.on('connection', (socket) => {
-    connectedClients.add(socket);
     ModuleController.initIoToSocket(socket);
-    socket.on('disconnect', () => {
-        connectedClients.delete(socket);
-    });
 });
 
+initRelay(io);
+
 // Iniciando os servidores WebSocket
-httpServerWS.listen(config.http.port, () => {
-    console.log(`HTTP Server in http://127.0.0.1:${config.http.port}`);
+httpServerWS.listen(config.http.port, '0.0.0.0', () => {
+    console.log(chalk.green(`HTTP Server running at http://127.0.0.1:${config.http.port}`));
 });
 
 // Interface de linha de comando (CLI) para enviar comandos
@@ -79,62 +76,71 @@ const rl = readline.createInterface({
 
 ModuleController.init(io, app, rl);
 
-var ExtenssionsMenu: any = {}
+let ExtensionsMenu: any = {};
 
+// Função para exibir o menu
 function showMenu() {
-    let menuText = `
-===================================
-    ​🇼​​🇸 ​​🇦​​🇨​​🇹​​🇮​​🇴​​🇳​ ${ABOUT.VERSION}
-    GITHUB: ${ABOUT.GIT}
-===================================
-Escolha uma das opções:
------------------------------------
-1. Listar clientes conectados
-2. Sair
-`;
+    //console.clear();  // Limpa o terminal para melhor visualização do menu
 
-    ExtenssionsMenu = {}
+    // Mostrar extensões habilitadas e desabilitadas logo após limpar o terminal
+    const enabledExtensions = ModuleController.EXTENSIONS.ENABLED.length > 0
+        ? ModuleController.EXTENSIONS.ENABLED.map(ext => ext.NAME).join(', ')
+        : '';
+
+    const disabledExtensions = ModuleController.EXTENSIONS.DISABLED.length > 0
+        ? ModuleController.EXTENSIONS.DISABLED.map(ext => ext.NAME).join(', ')
+        : '';
+
+    console.log(chalk.bold.greenBright('Extensões Habilitadas:'), chalk.green(`[${enabledExtensions}]`));
+    console.log(chalk.bold.redBright('Extensões Desabilitadas:'), chalk.red(`[${disabledExtensions}]`));
+
+    const border = chalk.bold.yellowBright('===================================');
+    let menuText = `
+${border}
+${chalk.bold.magentaBright('  🕹️  WSACTION')}${chalk.cyanBright(ABOUT.VERSION)}
+${chalk.greenBright('  🔗 GITHUB: ')} ${chalk.underline.blue(ABOUT.GIT)}
+${border}
+`;
+    menuText += chalk.bold('Escolha uma das opções:\n');
+
+    ExtensionsMenu = {};
+    let optionNumber = 1;
+
     // Adicionar comandos das extensões ao menu
-    let optionNumber = 3;
     for (const [extension, commands] of Object.entries(ModuleController.COMMANDS.CLI)) {
+        menuText += chalk.bold.green(`\nExtensão: ${chalk.blueBright(extension)}\n`);
         for (const [event, command] of Object.entries(commands)) {
-            menuText += `${optionNumber}. ${extension}.${event}: ${command.description}\n`;
-            ExtenssionsMenu[optionNumber] = command._function
+            menuText += `${chalk.yellow(optionNumber + '.')} ${chalk.green(event)}: ${chalk.white((command as any).description)}\n`;
+            ExtensionsMenu[optionNumber] = command._function;
             optionNumber++;
         }
+        menuText += chalk.bold.yellowBright('-----------------------------------');
     }
+
+    // Opção para sair
+    menuText += `\n${chalk.yellow(`${optionNumber}`)}. ${chalk.red('Sair')}\n`;
+
+    // Mostrar o menu
     console.log(menuText);
-
 }
 
-function listConnectedClients() {
-    console.log('Clientes conectados:');
-    connectedClients.forEach(client => {
-        console.log(`- ID: ${client.id}`);
-    });
-    showMenu();
-}
-
+// Função para lidar com a escolha do menu
 rl.on('line', (input) => {
     const option = input.trim();
-    switch (option) {
-        case '1':
-            listConnectedClients();
-            break;
-        case '2':
-            rl.close();
-            break;
-        default:
-            if (ExtenssionsMenu[option] == undefined) {
-                console.log('Opção inválida. Tente novamente.');
-                showMenu();
-            } else {
-                ExtenssionsMenu[option]()
-                break;
-            }
+    const selectedOption = Number(option);
+
+    if (selectedOption === Object.keys(ExtensionsMenu).length + 1) {
+        console.log(chalk.red('Encerrando...'));
+        rl.close();
+        process.exit(0);
+    } else if (!ExtensionsMenu[selectedOption]) {
+        console.log(chalk.red('Opção inválida. Tente novamente.'));
+        showMenu();
+    } else {
+        ExtensionsMenu[selectedOption]();
     }
 });
 
 showMenu();
 
-export default httpServerWS
+export default httpServerWS;

@@ -1,47 +1,65 @@
-export default function mount(name:string){
+export default function mount(name: string) {
     return `
 /**
  * Módulo da extensão.
  * 
- * @param {Object} WSIO - Instância do WebSocket IO.
- * @param {Object} APP - Instância do Express.
- * @param {Object} RL - Instância do Readline.
+ * @param {import('socket.io').Server} WSIO - Instância do WebSocket IO.
+ * @param {import('express').Application} APP - Instância do Express.
+ * @param {import('readline').Interface} RL - Instância do Readline.
  * @param {Object} STORAGE - Objeto de armazenamento compartilhado.
- * @param {Object} STORAGE.data - Objeto de armazenamento.
- * @param {Function} STORAGE.save - Função para salvar o armazenamento.
- * @param {Object} EXPRESS - Classe Express.
+ * @param {Object} STORAGE.data - Objeto que contém os dados de armazenamento.
+ * @param {Function} STORAGE.save - Função que salva o armazenamento.
+ * @param {typeof import('express')} EXPRESS - Classe Express.
+ * @param {Array<string>} [WEB_SCRIPTS=['client.js']] - Lista de scripts JavaScript a serem carregados dinamicamente.
+ * @param {string} EXTENSION_PATH - Caminho absoluto para a pasta da extensão
  * 
- * @returns {Object} - Objeto da extensão.
+ * @returns {{ start: Function, stop: Function }} - Objeto da extensão com funções \`start\` e \`stop\`.
  */
-module.exports = (WSIO, APP, RL, STORAGE, EXPRESS) => {
-    const ROUTER = EXPRESS.Router();
-    const NAME = "${name.toUpperCase()}";
+module.exports = ({
+    WSIO, 
+    APP, 
+    RL, 
+    STORAGE, 
+    EXPRESS, 
+    WEB_SCRIPTS = ['client.js'], 
+    EXTENSION_PATH = '', 
+    ID = ''
+}) => {
     const ENABLED = true;
+    const NAME = "${name.toUpperCase()}";
+    const CLIENT_LINK = \`\${NAME}/client\`;
+    const ROUTER = EXPRESS.Router();
+
+    // Definindo os eventos do WebSocket
     const IOEVENTS = {
-        "example:event": {
-            description: "Descrição do evento de exemplo",
+        "sendMessage": {
+            description: "Envio de uma mensagem de texto para o servidor WebSocket.",
             _function: (data) => {
-                WSIO.emit(\`\${NAME}:event\`, data);
+                WSIO.to(ID).emit(\`message\`, data);
             }
         }
     };
+
+    // Definindo os comandos do Readline
     const COMMANDS = {
         "exampleCommand": {
-            description: "Descrição do comando de exemplo",
-            _function: (data) => {
-                RL.question('Digite um valor de exemplo: ', (input) => {
-                    WSIO.emit(\`\${NAME}:command\`, { command: 'example', payload: input });
+            description: "Comando de exemplo para enviar uma mensagem pelo WebSocket.",
+            _function: () => {
+                RL.question('Digite uma mensagem para enviar: ', (input) => {
+                    WSIO.to(ID).emit(\`message\`, { message: input });
                 });
             }
         }
     };
+
     const onInitialize = () => {
-        console.log(\`\${NAME} initialized.\`);
+        // console.log(\`\${NAME} initialized.\`);
     };
+
     const onError = (error) => {
-        console.error(\`\${NAME} error: \${error.message}\`);
+        // console.error(\`\${NAME} error: \${error.message}\`);
     };
-    const CLIENT_LINK = \`\${NAME}/client\`;
+
     return {
         NAME,
         ROUTER,
@@ -49,6 +67,9 @@ module.exports = (WSIO, APP, RL, STORAGE, EXPRESS) => {
         IOEVENTS,
         COMMANDS,
         CLIENT_LINK,
+        EXTENSION_PATH,
+        WEB_SCRIPTS,
+        ID,
         onInitialize,
         onError
     };

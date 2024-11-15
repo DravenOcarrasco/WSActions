@@ -1,12 +1,17 @@
 {
     "manifest_version": 3,
     "name": "WSActions",
-    "version": "2.0",
+    "version": "2.9",
     "description": "Facilita a injeção de scripts personalizados para auxiliar em processos repetitivos entre vários navegadores.",
     "permissions": [
+        "tabs",
         "storage",
         "activeTab",
-        "scripting"
+        "scripting",
+        "proxy",
+        "webRequest",
+        "declarativeNetRequest",
+        "webNavigation"
     ],
     "action": {
         "default_popup": "popup.html",
@@ -32,11 +37,23 @@
     ],
     "web_accessible_resources": [
         {
-            "resources": ["idScript.js", "libs/jquery-3.5.1.min.js", "libs/popper.min.js", "libs/js/bootstrap.min.js", "libs/css/bootstrap.min.css"],
+            "resources": ["idScript.js", "libs/jquery-3.5.1.min.js", "libs/popper.min.js", "libs/js/bootstrap.min.js", "libs/js/socket.io.min.js", "libs/css/bootstrap.min.css"],
             "matches": ["<all_urls>"]
         }
     ],
+    "declarative_net_request": {
+        "rule_resources": [{
+            "id": "ruleset_1",
+            "enabled": true,
+            "path": "rules.json"
+        }]
+    },
     "content_security_policy": {
         "extension_pages": "script-src 'self'; object-src 'self'"
+    },
+    "externally_connectable": {
+        "matches": [
+            "<all_urls>"
+        ]
     }
 }

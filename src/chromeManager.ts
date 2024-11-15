@@ -1,9 +1,9 @@
 import puppeteer from 'puppeteer-extra';
-import { Browser, Page } from 'puppeteer';
+import { Browser, Page, Frame, Target } from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 import { ScriptInjector } from './scriptInjector';
-import { loadConfig } from './config'; // Importa a função de configuração
+import { loadConfig } from './utils/config'; // Importa a função de configuração
 import { exec } from 'child_process';
 import { ChromeProfileInfo } from './interfaces/ChromeProfileInfo';
 
@@ -16,6 +16,7 @@ const config = loadConfig(); // Carrega a configuração
 
 const puppeteerStealth = StealthPlugin();
 puppeteerStealth.enabledEvasions.delete('user-agent-override');
+
 puppeteer.use(puppeteerStealth)
 // puppeteer.use(RecaptchaPlugin())
 
@@ -69,32 +70,65 @@ function getProfilesData(): ProfilesData {
     return JSON.parse(profilesContent);
 }
 
-// Launch a new Chrome instance
-async function launchChrome(profileName: string, extensions: string[], profileInfo:ChromeProfileInfo): Promise<ChromeInstance> {
+// Função para navegar para uma URL de maneira segura
+async function safeGoto(page: Page, url: string): Promise<void> {
+    
+    try {
+        if (!page.isClosed() && page.url() !== url) {
+            return
+        }
+    } catch (error) {
+        return
+    }
+
+    if (page.isClosed()) {
+        console.warn('Page is already closed, cannot navigate.');
+        return;
+    }
+    try {
+        await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
+    } catch (error: any) {
+        if (error.message.includes('Frame was detached')) {
+            console.warn('Frame was detached during navigation, retrying...');
+            if (!page.isClosed()) {
+                await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
+            } else {
+                console.warn('Page is closed after frame detachment, cannot retry navigation.');
+            }
+        } else {
+            console.error('Error navigating:', error.message);
+            throw error; // Rethrow other errors
+        }
+    }
+}
+
+// Função para lançar uma nova instância do Chrome
+async function launchChrome(profileName: string, extensions: string[], profileInfo: ChromeProfileInfo): Promise<ChromeInstance> {
     const extensionPaths = extensions.join(',');
     const args = [
-        '--disable-web-security', // Disable web security
-        '--disable-features=IsolateOrigins,site-per-process', // Disable site isolation
-        '--allow-running-insecure-content', // Allow running insecure content
-        '--disable-features=TrustedTypes', // Disable TrustedTypes
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--allow-running-insecure-content',
+        '--disable-features=TrustedTypes',
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--enable-gpu',
-        `--disable-extensions-except=${extensionPaths}`
+        `--disable-extensions-except=${extensionPaths}`,
+        '--disable-infobars'
     ];
 
-    if(profileInfo.proxy && profileInfo.proxy.enabled){
-        args.push(`--proxy-server=${profileInfo.proxy.ip}`)
+    if (profileInfo.proxy?.enabled) {
+        args.push(`--proxy-server=${profileInfo.proxy.ip}`);
     }
-    
+
     const browser = await puppeteer.launch({
-        headless: profileInfo.headless, // Set headless to false to open the browser with a UI
+        headless: profileInfo.headless,
         executablePath: config.chromeExecutablePath,
         userDataDir: path.join(profilePath, profileName),
         args
     });
 
-    browser.on('targetcreated', async (target) => {
+    browser.on('targetcreated', async (target: Target) => {
         try {
             const newPage = await target.page();
             if (newPage) {
@@ -104,35 +138,55 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
             console.error('Error setting up new page:', error);
         }
     });
+
+    const monitorPages = async () => {
+        const injectedPages = new Set();
+
+        while (true) {
+            const pages = await browser.pages();
     
-    let _pages = await browser.pages();
-    if(_pages.length == 0 ){
-        await browser.newPage();
+            if (pages.length === 0) {
+                console.log(`Nenhuma página aberta no perfil ${profileName}. Fechando navegador...`);
+                await browser.close();
+                instances = instances.filter(i => i.browser !== browser);
+                break;
+            }
+    
+            for (const page of pages) {
+                if (!injectedPages.has(page)) {
+                    injectedPages.add(page);
+                    await setupPage(page, profileName);
+                }
+            }
+    
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+    };
+
+    let [page] = await browser.pages();
+    if (!page) {
+        page = await browser.newPage();
     }
-    let page:Page = (await browser.pages())[0];
-    
-    if(profileInfo.proxy && profileInfo.proxy.enabled){
+
+    if (profileInfo.proxy && profileInfo.proxy.enabled) {
         await page.authenticate({
             username: profileInfo.proxy.user,
             password: profileInfo.proxy.passw,
         });
     }
-    
-    try {
-        await page.goto(config.defaultPageUrl);
-        setTimeout(()=>{
-            page.reload()
-        }, 1000)
-    } catch (error) {
-        console.error('Error navigating to default page:', error);
-    }
 
     try {
-        await setupPage(page, profileName);
-    } catch (error) {
-        console.error('Error setting up main page:', error);
+        await safeGoto(page, config.defaultPageUrl);
+    } catch (error: any) {
+        if (error.message && error.message.includes('Navigating frame was detached')) {
+            console.warn('Frame was detached during navigation, retrying...');
+        } else {
+            console.error('Error navigating to default page:', error);
+        }
     }
-    
+
+    // Iniciar monitoramento de páginas
+    monitorPages();
     const instance = { browser, page };
     instances.push(instance);
     return instance;
@@ -140,54 +194,50 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
 
 // Setup page settings and script injection
 async function setupPage(page: Page, profileName: string): Promise<void> {
-    try {
-        await page.setBypassCSP(true); // Bypass CSP
-        // await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36')
-        await page.setViewport({ 
-            width: config.chromeConfig.viewportWidth, 
-            height: config.chromeConfig.viewportHeight 
-        });
-
-        // Function to inject the script
+        try {
+        await page.setBypassCSP(true);
         const injectScripts = async () => {
             try {
-                await scriptInjector.injectScriptFromString(page, `if(window.injectorPort == undefined) window.injectorPort = '${config.http.port}'`);
-                await scriptInjector.injectScriptFromString(page, `if(window.identifier == undefined) window.identifier = '${profileName}'`);
+                const ip = '127.0.0.1';
+                const port = 9514;
+                const identifier = profileName;
+                const delay = 1;
+                const script = `
+                    if (!window.WSACTION) {
+                        window.WSACTION = { config: {} };
+                    }
+                    window.WSACTION.config = {
+                        ip: '${ip}',
+                        port: ${port},
+                        identifier: '${identifier}',
+                        delay: ${delay}
+                    };
+                `;
+                await page.evaluateOnNewDocument(script);
                 await injectScript(page);
             } catch (error) {
                 console.error('Error during script injection:', error);
             }
         };
-        
-        // Initial script injection
-        page.once('load', injectScripts);
 
-        // Event listeners for frame navigation
+        // Event listeners
+        page.once('load', async () => {
+            await injectScripts();
+        });
+
+        page.once('domcontentloaded', async () => {
+            await injectScripts();
+        });
+
         page.on('framenavigated', async (frame) => {
             if (frame === page.mainFrame()) {
                 await injectScripts();
             }
         });
 
-        page.on('framenavigationfailed', async (frame) => {
-            if (frame === page.mainFrame()) {
-                await injectScripts();
-            }
-        });
-
-        // Handle popups
-        page.on('popup', async (popupPage: Page | null) => {
-            if (popupPage) {
-                try {
-                    await setupPage(popupPage, profileName);
-                } catch (error) {
-                    console.error('Error during popup setup:', error);
-                }
-            }
-        });
-
+        await injectScripts();
     } catch (error) {
-        console.error('Error during page setup:', error);
+        console.error('Erro durante a configuração da página:', error);
     }
 }
 
@@ -368,22 +418,33 @@ function addExtensionToGroup(groupName: string, extension: string): void {
 
 // Launch profiles by name
 async function launchProfilesByName(name: string): Promise<ChromeInstance[]> {
-    const instances:ChromeInstance[] = []
-    var extensions = [...new Set([...getProfilesData().defaultExtensions, ...getProfileInfo(name)?.extensions ?? []])];
+    const instances: ChromeInstance[] = [];
+    const extensions = [...new Set([...getProfilesData().defaultExtensions, ...getProfileInfo(name)?.extensions ?? []])];
     const profiles = listProfilesInfo();
-    const profileNames = profiles.filter(profile => profile.name === name).map(profile => profile.folder_name);
+
+    // Criar uma regex para correspondência de nome (case-insensitive)
+    const nameRegex = new RegExp(name, 'i'); // 'i' para ignorar diferença de maiúsculas e minúsculas
+
+    // Filtrar os perfis que correspondem ao padrão do nome fornecido usando a regex
+    let profileNames = profiles
+        .filter(profile => nameRegex.test(profile.name)) // Usar regex para filtrar os nomes dos perfis
+        .map(profile => profile.folder_name);
+
     if (profileNames.length === 0) {
-        // Profile does not exist, create it
+        // Se não há correspondência, criar um novo perfil
         createProfile(name);
         profileNames.push(name);
     }
+
+    // Para cada perfil correspondente, lançar uma instância do Chrome
     for (const profileName of profileNames) {
-        const prof = getProfileInfo(profileName)
-        if(prof){
+        const prof = getProfileInfo(profileName);
+        if (prof) {
             instances.push(await launchChrome(profileName, extensions, prof));
         }
     }
-    return instances
+
+    return instances;
 }
 
 // Add default extensions
@@ -405,7 +466,7 @@ function removeDefaultExtension(extension: string): void {
 // Create a shortcut for a Chrome profile
 function createChromeProfileShortcut(profileName: string, shortcutPath: string): void {
     const workingDir = process.cwd();
-    const target = path.resolve(workingDir, 'server.exe'); // Caminho para o executável do servidor
+    const target = path.resolve(workingDir, path.resolve(process.execPath)); // Caminho para o executável do servidor
     const args = `open-chrome --profile "${profileName}"`;
 
     // Garantir que o diretório de shortcuts exista
@@ -425,7 +486,7 @@ function createChromeProfileShortcut(profileName: string, shortcutPath: string):
 // Create a shortcut to open a group of profiles
 function createGroupShortcut(groupName: string, shortcutPath: string): void {
     const workingDir = process.cwd();
-    const target = path.resolve(workingDir, 'server.exe'); // Caminho para o executável do servidor
+    const target = path.resolve(workingDir, path.resolve(process.execPath)); // Caminho para o executável do servidor
     const args = `open-group --name "${groupName}"`;
 
     const command = `powershell -command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('${shortcutPath}'); $s.TargetPath = '${target}'; $s.Arguments = '${args}'; $s.WorkingDirectory = '${workingDir}'; $s.Save()"`;

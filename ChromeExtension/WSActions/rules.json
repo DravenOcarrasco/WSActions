@@ -1,0 +1,41 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        {
+          "header": "content-security-policy",
+          "operation": "remove"
+        },
+        {
+          "header": "content-security-policy-report-only",
+          "operation": "remove"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*",
+      "resourceTypes": ["main_frame", "sub_frame", "script"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 2,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        {
+          "header": "access-control-allow-origin",
+          "operation": "set",
+          "value": "*"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||127.0.0.1:9514/*",
+      "resourceTypes": ["script"]
+    }
+  }
+]

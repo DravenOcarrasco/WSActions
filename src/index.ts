@@ -1,47 +1,134 @@
+import './utils/customRequire'
 import ChromeManager from './chromeManager';
-import { loadConfig } from './config';
+import { loadConfig } from './utils/config';
+
 const config = loadConfig();
 ChromeManager.initializeChromeManager(config.chromeProfilePath);
+
 import path from 'path';
 import fs from 'fs';
 import { exec } from 'child_process';
-import { startWebSocketServer, sendToServer, io } from './cli-websocket';
+import { startWebSocketServer, sendToServer, io } from './modules/cli-websocket';
 
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
 import indexExample from './examples/index';
 import clientExample from './examples/client';
+import iconExample from './examples/icon';
+import metaExample from './examples/metadata'
+
 import prompts from 'prompts';
+import ABOUT from './about';
+
+import ServerHandler from './ServerHandler';
 
 const IoPort = 9532;
-// Função para criar um atalho usando PowerShell
-function createShortcut(executablePath: string, shortcutName: string, args: string) {
-    const shortcutPath = path.join(process.cwd(), `${shortcutName}.lnk`);
-    if (fs.existsSync(shortcutPath)) {
-        // console.log(`Shortcut ${shortcutName} already exists.`);
-        return Promise.resolve(`Shortcut ${shortcutName} already exists.`);
-    }
-    const powershellScript = `
-        $WScriptShell = New-Object -ComObject WScript.Shell;
-        $Shortcut = $WScriptShell.CreateShortcut('${shortcutPath}');
-        $Shortcut.TargetPath = '${executablePath}';
-        $Shortcut.Arguments = '${args}';
-        $Shortcut.Save();
-    `;
-    const encodedCommand = Buffer.from(powershellScript, 'utf16le').toString('base64');
+// Função para criar um atalho ou script shell
+function createShortcut(
+    executablePath: string, 
+    shortcutName: string, 
+    args: string, 
+    overwrite: boolean = false // Opção para sobrescrever o atalho
+): Promise<string> {
+    const platform = process.platform;
+    const currentDir = process.cwd();
+
     return new Promise((resolve, reject) => {
-        exec(`powershell -EncodedCommand ${encodedCommand}`, (error, stdout, stderr) => {
-            if (error) {
-                reject(`Error creating shortcut: ${error}`);
+        let shortcutPath: string;
+        let scriptPath: string | undefined;
+
+        if (platform === 'win32') {
+            shortcutPath = path.join(currentDir, `${shortcutName}.lnk`);
+        } else if (platform === 'darwin') {
+            shortcutPath = path.join(currentDir, `${shortcutName}.alias`);
+        } else if (platform === 'linux') {
+            // Cria tanto o arquivo .desktop quanto o script shell no Linux
+            shortcutPath = path.join(currentDir, `${shortcutName}.desktop`);
+            scriptPath = path.join(currentDir, `${shortcutName}.sh`);
+        } else {
+            return reject(`Plataforma não suportada: ${platform}`);
+        }
+
+        // Verifica se o atalho já existe
+        if (fs.existsSync(shortcutPath)) {
+            if (!overwrite) {
+                return resolve(`O atalho ${shortcutName} já existe.`);
             } else {
-                resolve(`Shortcut ${shortcutName} created successfully.`);
+                // Remove o atalho existente antes de criar um novo
+                fs.unlinkSync(shortcutPath);
             }
-        });
+        }
+
+        if (platform === 'win32') {
+            // Windows
+            const powershellScript = `
+                $WScriptShell = New-Object -ComObject WScript.Shell;
+                $Shortcut = $WScriptShell.CreateShortcut('${shortcutPath}');
+                $Shortcut.TargetPath = '${executablePath}';
+                $Shortcut.Arguments = '${args}';
+                $Shortcut.WorkingDirectory = '${currentDir}';
+                $Shortcut.Save();
+            `;
+            const encodedCommand = Buffer.from(powershellScript, 'utf16le').toString('base64');
+            exec(`powershell -EncodedCommand ${encodedCommand}`, (error, stdout, stderr) => {
+                if (error) {
+                    reject(`Erro ao criar atalho: ${error.message}`);
+                } else {
+                    resolve(`Atalho ${shortcutName} criado com sucesso.`);
+                }
+            });
+        } else if (platform === 'darwin') {
+            // macOS
+            const applescript = `
+                tell application "Finder"
+                    make alias file to POSIX file "${executablePath}" at POSIX file "${currentDir}"
+                    set name of result to "${shortcutName}.alias"
+                end tell
+            `;
+            exec(`osascript -e '${applescript}'`, (error, stdout, stderr) => {
+                if (error) {
+                    reject(`Erro ao criar atalho: ${error.message}`);
+                } else {
+                    resolve(`Atalho ${shortcutName} criado com sucesso.`);
+                }
+            });
+        } else if (platform === 'linux') {
+            if (!scriptPath) {
+                return reject('Caminho do script não definido no Linux.');
+            }
+            // Linux - Criar arquivo .desktop
+            const desktopEntry = `[Desktop Entry]
+Name=${shortcutName}
+Exec="${scriptPath}"
+Type=Application
+Terminal=false
+`;
+            fs.writeFile(shortcutPath, desktopEntry, { mode: 0o755 }, (err) => {
+                if (err) {
+                    return reject(`Erro ao criar arquivo .desktop: ${err.message}`);
+                } else {
+                    // Depois de criar o arquivo .desktop, criar o script shell
+                    const scriptContent = `#!/bin/bash
+"${executablePath}" ${args}
+`;
+                    fs.writeFile(scriptPath, scriptContent, { mode: 0o755 }, (err) => {
+                        if (err) {
+                            reject(`Erro ao criar script shell: ${err.message}`);
+                        } else {
+                            resolve(`Atalho ${shortcutName} criado com sucesso.`);
+                        }
+                    });
+                }
+            });
+        } else {
+            reject(`Plataforma não suportada: ${platform}`);
+        }
     });
 }
-createShortcut(path.resolve(process.execPath), 'Run-Server', 'server')
-createShortcut(path.resolve(process.execPath), 'open-chrome', 'open-chrome')
+createShortcut(path.resolve(process.execPath), 'Run-Server', 'server', true)
+createShortcut(path.resolve(process.execPath), 'Open-Chrome', 'open-chrome', true)
+createShortcut(path.resolve(process.execPath), 'Create-Extension', 'create-extension', true)
 
 // Função para criar uma extensão
 async function createExtension(name: string) {
@@ -56,10 +143,25 @@ async function createExtension(name: string) {
 
     const indexFileContent = indexExample(name);
     const clientFileContent = clientExample(name);
+    const iconExampleB64 = iconExample();
+    const metadExample = metaExample({
+        name,
+        minVersion: ABOUT.VERSION,
+        github: "https://github.com/myextension",
+        compatibility: [`${ABOUT.VERSION}`],
+        WEB_SCRIPTS : [
+            'client.js'
+        ]
+    });
 
     fs.writeFileSync(path.join(extensionDir, 'index.js'), indexFileContent.trim());
     fs.writeFileSync(path.join(extensionDir, 'client.js'), clientFileContent.trim());
-
+    fs.writeFileSync(path.join(extensionDir, 'meta.json'), JSON.stringify(metadExample, null, 4));
+    
+    // Converte o Base64 para buffer e salva como um arquivo PNG
+    const iconBuffer = Buffer.from(iconExampleB64, 'base64');
+    fs.writeFileSync(path.join(extensionDir, 'icon.png'), iconBuffer);
+    
     console.log(`Extensão ${name} criada com sucesso em ${extensionDir}.`);
 }
 
@@ -367,12 +469,7 @@ yargs(hideBin(process.argv))
         command: "server",
         describe: "inicializa em modo servidor",
         async handler(argv) {
-            let io = await startWebSocketServer();
-            io?.listen(IoPort);
-            const { default: api } = await import('./api');
-            const { scheduleProfiles } = await import('./modules/schedule');
-            scheduleProfiles();
-            const API = api;
+            ServerHandler(IoPort)
         }
     })
     .parse();

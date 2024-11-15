@@ -1,88 +1,105 @@
-const defaultPort = 9514;
-const defaultDelay = 1000;
-const defaultIP = '127.0.0.1';
+// popup.js
 
+// === Configurações Padrão ===
+const DEFAULTS = {
+    port: 9514,
+    delay: 1000,
+    ip: '127.0.0.1',
+    allowedExtensionNames: [
+        'CHROME-TOOLS'
+    ]
+};
+
+// === Estado Global ===
 let isChanged = false;
+
+// === Utilitários ===
 
 // Função para gerar um identificador único
 function generateIdentifier() {
     return Math.random().toString(36).substr(2, 16);
 }
 
-// Função para armazenar o identificador usando chrome.storage
+// Função para armazenar dados usando chrome.storage.sync
+function storeData(key, value, message) {
+    chrome.storage.sync.set({ [key]: value }, () => {
+        console.log(`${message}:`, value);
+    });
+}
+
+// Função para obter dados do chrome.storage.sync
+function getData(key, callback) {
+    chrome.storage.sync.get(key, (data) => {
+        callback(data[key]);
+    });
+}
+
+// === Armazenamento Específico ===
+
 function storeIdentifier(identifier) {
-    chrome.storage.sync.set({ identifier: identifier }, function () {
-        console.log('Identificador armazenado:', identifier);
-    });
+    storeData('identifier', identifier, 'Identificador armazenado');
 }
 
-// Função para obter o identificador armazenado
 function getIdentifier(callback) {
-    chrome.storage.sync.get('identifier', function (data) {
-        callback(data.identifier);
-    });
+    getData('identifier', callback);
 }
 
-// Função para armazenar a porta do serviço
 function storeServicePort(port) {
-    chrome.storage.sync.set({ servicePort: port }, function () {
-        console.log('Porta do serviço armazenada:', port);
-    });
+    storeData('servicePort', port, 'Porta do serviço armazenada');
 }
 
-// Função para obter a porta do serviço armazenada
 function getServicePort(callback) {
-    chrome.storage.sync.get('servicePort', function (data) {
-        callback(data.servicePort);
-    });
+    getData('servicePort', callback);
 }
 
-// Função para armazenar o atraso do script
 function storeScriptDelay(delay) {
-    chrome.storage.sync.set({ scriptDelay: delay }, function () {
-        console.log('Atraso do script armazenado:', delay);
-    });
+    storeData('scriptDelay', delay, 'Atraso do script armazenado');
 }
 
-// Função para obter o atraso do script armazenado
 function getScriptDelay(callback) {
-    chrome.storage.sync.get('scriptDelay', function (data) {
-        callback(data.scriptDelay);
-    });
+    getData('scriptDelay', callback);
 }
 
-// Função para armazenar o IP do servidor
 function storeServerIP(ip) {
-    chrome.storage.sync.set({ serverIP: ip }, function () {
-        console.log('IP do servidor armazenado:', ip);
-    });
+    storeData('serverIP', ip, 'IP do servidor armazenado');
 }
 
-// Função para obter o IP do servidor armazenado
 function getServerIP(callback) {
-    chrome.storage.sync.get('serverIP', function (data) {
-        callback(data.serverIP);
-    });
+    getData('serverIP', callback);
 }
 
-// Função para verificar a conexão com o serviço
+function storePermissionToControl(permissions) {
+    storeData('allowedExtensionNames', permissions, 'Permissões atualizadas');
+}
+
+function getPermissionToControl(callback) {
+    getData('allowedExtensionNames', (data) => callback(data || []));
+}
+
+// === Verificação de Conexão ===
+
 function checkConnection(ip, port) {
     const url = `http://${ip}:${port}/client.js`;
     fetch(url)
-    .then(response => {
-        if (response.ok) {
-            document.getElementById('status').innerText = 'Conectado';
-            document.getElementById('status').classList.remove('text-danger');
-            document.getElementById('status').classList.add('text-success');
-            console.log('client.js carregado com sucesso');
-        }
-    })
-    .catch(() => {
-        document.getElementById('status').innerText = 'Desconectado';
-        document.getElementById('status').classList.remove('text-success');
-        document.getElementById('status').classList.add('text-danger');
-    });
+        .then(response => {
+            if (response.ok) {
+                updateStatus('Conectado', 'text-success', 'client.js carregado com sucesso');
+            }
+        })
+        .catch(() => {
+            updateStatus('Desconectado', 'text-danger');
+        });
 }
+
+function updateStatus(text, classToAdd, logMessage) {
+    const statusElement = document.getElementById('status');
+    statusElement.innerText = text;
+    statusElement.classList.remove('text-danger', 'text-success');
+    statusElement.classList.add(classToAdd);
+    if (logMessage) console.log(logMessage);
+}
+
+// === Manipulação de Eventos de Recarga ===
 
 function showReloadButton() {
     const reloadButton = document.getElementById('reloadButton');
@@ -94,85 +111,220 @@ function sendReloadEvent() {
     document.dispatchEvent(event);
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    // Verificar se o identificador já está armazenado
-    getIdentifier(function (identifier) {
+// === Gestão de CSP ===
+
+function initializeCSPToggle() {
+    const cspToggle = document.getElementById('disableCSP');
+    
+    // Carregar estado atual do storage local
+    chrome.storage.local.get(['disableCSP'], (result) => {
+        cspToggle.checked = result.disableCSP !== false;
+    });
+
+    // Listener para mudanças no toggle
+    cspToggle.addEventListener('change', function() {
+        const value = this.checked;
+        // Salvar no storage local
+        chrome.storage.local.set({ disableCSP: value }, () => {
+            // Enviar mensagem para o background script
+            chrome.runtime.sendMessage({
+                action: 'toggleCSP',
+                value: value
+            }, (response) => {
+                if (response && response.status === 'success') {
+                    console.log('CSP configuração atualizada:', value ? 'desativado' : 'ativado');
+                } else {
+                    console.error('Erro ao atualizar configuração CSP');
+                    // Reverter o toggle em caso de erro
+                    this.checked = !value;
+                }
+            });
+        });
+    });
+}
+
+// === Gestão de Extensões Permitidas ===
+
+function addExtensionToList(extensionName) {
+    const allowedExtensionsList = document.getElementById('allowedExtensionsList');
+
+    // Verificar se o nome já está na lista
+    const exists = Array.from(allowedExtensionsList.children).some(
+        item => item.getAttribute('data-extension-name').toLowerCase() === extensionName.toLowerCase()
+    );
+
+    if (exists) {
+        alert('Este nome de extensão já está na lista de permissões.');
+        return;
+    }
+
+    const listItem = createExtensionListItem(extensionName);
+    allowedExtensionsList.appendChild(listItem);
+    saveAllowedExtensions();
+}
+
+function createExtensionListItem(extensionName) {
+    const listItem = document.createElement('li');
+    listItem.setAttribute('data-extension-name', extensionName);
+
+    const span = document.createElement('span');
+    span.textContent = extensionName;
+
+    const removeButton = document.createElement('button');
+    removeButton.className = 'btn btn-danger btn-sm m-2';
+    removeButton.type = 'button';
+    removeButton.textContent = 'Remover';
+    removeButton.addEventListener('click', () => {
+        listItem.remove();
+        saveAllowedExtensions();
+    });
+
+    listItem.appendChild(span);
+    listItem.appendChild(removeButton);
+    return listItem;
+}
+
+function saveAllowedExtensions() {
+    const allowedExtensionsList = document.getElementById('allowedExtensionsList');
+    const extensions = Array.from(allowedExtensionsList.children).map(
+        item => item.getAttribute('data-extension-name')
+    );
+    storePermissionToControl(extensions);
+}
+
+function loadAllowedExtensions() {
+    getPermissionToControl((extensions) => {
+        const allowedExtensionsList = document.getElementById('allowedExtensionsList');
+        allowedExtensionsList.innerHTML = ''; // Limpar lista antes de carregar
+
+        extensions.forEach(extensionName => {
+            const listItem = createExtensionListItem(extensionName);
+            allowedExtensionsList.appendChild(listItem);
+        });
+    });
+}
+
+// === Inicialização e Event Listeners ===
+
+document.addEventListener('DOMContentLoaded', () => {
+    initializeIdentifier();
+    loadAllowedExtensions();
+    initializeInputListeners();
+    initializeStoredValues();
+    initializeButtons();
+    initializePopup();
+    initializeCSPToggle();
+});
+
+// Inicializa o identificador
+function initializeIdentifier() {
+    getIdentifier((identifier) => {
         if (identifier) {
             console.log('Identificador armazenado:', identifier);
             document.getElementById('deviceId').innerText = identifier;
-            document.getElementById('identifier').value = identifier; // Exibir no campo de texto
-            // window.identifier = identifier;
+            document.getElementById('identifier').value = identifier;
         } else {
             const newIdentifier = generateIdentifier();
             storeIdentifier(newIdentifier);
-            storeServicePort(defaultPort);
-            storeScriptDelay(defaultDelay);
-            storeServerIP(defaultIP);
-            document.getElementById('identifier').value = newIdentifier; // Exibir no campo de texto
-            window.identifier = newIdentifier;
+            storeServicePort(DEFAULTS.port);
+            storeScriptDelay(DEFAULTS.delay);
+            storeServerIP(DEFAULTS.ip);
+
+            document.getElementById('identifier').value = newIdentifier;
             console.log('Novo identificador gerado e armazenado:', newIdentifier);
         }
     });
+}
 
-    // Monitorar mudanças no campo de identificador e salvar automaticamente
+// Inicializa os listeners para os campos de entrada
+function initializeInputListeners() {
+    // Listener para o identificador
     document.getElementById('identifier').addEventListener('input', function () {
-        const identifier = this.value;
+        const identifier = this.value.trim();
         if (identifier) {
             storeIdentifier(identifier);
-            isChanged = true;
-            showReloadButton();
+            markAsChanged();
         }
     });
 
-    // Monitorar mudanças nos campos e salvar automaticamente
+    // Listener para a porta do serviço
     document.getElementById('servicePort').addEventListener('input', function () {
-        const port = this.value;
+        const port = this.value.trim();
         if (port) {
             storeServicePort(port);
-            isChanged = true;
-            showReloadButton();
-        }
-    });
-
-    document.getElementById('scriptDelay').addEventListener('input', function () {
-        const delay = this.value;
-        if (delay !== '') {
-            storeScriptDelay(delay);
-            isChanged = true;
-            showReloadButton();
-        }
-    });
-
-    document.getElementById('serverIP').addEventListener('input', function () {
-        const ip = this.value;
-        if (ip) {
-            storeServerIP(ip);
-            isChanged = true;
-            showReloadButton();
-        }
-    });
-
-    // Carregar a porta do serviço armazenada no input ao carregar a página
-    getServicePort(function (port) {
-        if (port) {
-            document.getElementById('servicePort').value = port;
-            getServerIP(function (ip) {
-                checkConnection(ip || defaultIP, port);
+            markAsChanged();
+            getServerIP((ip) => {
+                checkConnection(ip || DEFAULTS.ip, port);
             });
         }
     });
 
-    // Carregar o atraso do script armazenado no input ao carregar a página
-    getScriptDelay(function (delay) {
+    // Listener para o atraso do script
+    document.getElementById('scriptDelay').addEventListener('input', function () {
+        const delay = this.value.trim();
+        if (delay !== '') {
+            storeScriptDelay(delay);
+            markAsChanged();
+        }
+    });
+
+    // Listener para o IP do servidor
+    document.getElementById('serverIP').addEventListener('input', function () {
+        const ip = this.value.trim();
+        if (ip) {
+            storeServerIP(ip);
+            markAsChanged();
+            getServicePort((port) => {
+                checkConnection(ip, port || DEFAULTS.port);
+            });
+        }
+    });
+}
+
+// Marca que houve alterações e exibe o botão de recarregar
+function markAsChanged() {
+    isChanged = true;
+    showReloadButton();
+}
+
+// Inicializa os valores armazenados nos campos de entrada
+function initializeStoredValues() {
+    // Porta do serviço
+    getServicePort((port) => {
+        if (port) {
+            document.getElementById('servicePort').value = port;
+            getServerIP((ip) => {
+                checkConnection(ip || DEFAULTS.ip, port);
+            });
+        }
+    });
+
+    // Atraso do script
+    getScriptDelay((delay) => {
         if (delay) {
             document.getElementById('scriptDelay').value = delay;
         }
     });
 
-    // Carregar o IP do servidor armazenado no input ao carregar a página
-    getServerIP(function (ip) {
+    // IP do servidor
+    getServerIP((ip) => {
         if (ip) {
             document.getElementById('serverIP').value = ip;
+        }
+    });
+}
+
+// Inicializa os botões de adicionar extensão e recarregar
+function initializeButtons() {
+    // Botão para adicionar uma nova extensão permitida
+    document.getElementById('addExtensionButton').addEventListener('click', () => {
+        const newExtensionName = document.getElementById('newExtensionName').value.trim();
+        if (newExtensionName) {
+            addExtensionToList(newExtensionName);
+            document.getElementById('newExtensionName').value = ''; // Limpar campo de entrada
+            markAsChanged();
+        } else {
+            alert('Por favor, insira um nome de extensão válido.');
         }
     });
 
@@ -180,6 +332,41 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('reloadButton').addEventListener('click', function () {
         if (isChanged) {
             sendReloadEvent();
+            isChanged = false;
+            this.style.display = 'none';
         }
     });
-});
+}
+
+function initializePopup() {
+    const proxyModeSelect = document.getElementById('proxyMode');
+    const manualProxyConfig = document.getElementById('manualProxyConfig');
+
+    proxyModeSelect.addEventListener('change', function () {
+        const selectedMode = proxyModeSelect.value;
+
+        // Mostrar ou ocultar a configuração manual do proxy
+        manualProxyConfig.style.display = selectedMode === 'http' || selectedMode === 'https' ? 'block' : 'none';
+
+        // Salvar o modo de proxy
+        chrome.storage.local.set({ proxyMode: selectedMode });
+    });
+
+    document.getElementById('proxyIP').addEventListener('input', saveManualProxyConfig);
+    document.getElementById('proxyPort').addEventListener('input', saveManualProxyConfig);
+
+    // Carregar configurações do storage
+    chrome.storage.local.get(['proxyMode', 'proxyIP', 'proxyPort'], (prefs) => {
+        proxyModeSelect.value = prefs.proxyMode || 'auto';
+        document.getElementById('proxyIP').value = prefs.proxyIP || '';
+        document.getElementById('proxyPort').value = prefs.proxyPort || '';
+        manualProxyConfig.style.display = proxyModeSelect.value === 'http' || proxyModeSelect.value === 'https' ? 'block' : 'none';
+    });
+}
+
+function saveManualProxyConfig() {
+    const proxyIP = document.getElementById('proxyIP').value;
+    const proxyPort = document.getElementById('proxyPort').value;
+
+    chrome.storage.local.set({ proxyIP, proxyPort });
+}

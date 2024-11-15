@@ -5,148 +5,90 @@
  */
 export default function mount(name: string) {
     return `
-(async function () {
+(async function (
+    EXTENSION_ID,
+    SHARED_CONTEXT
+) {
     /**
-     * Function to create the context for the module.
-     * @returns {Promise<object>} - The context object containing module details and methods.
+     * Function to create a module context with WebSocket, storage, and custom data capabilities.
+     * This function returns a context object with methods that allow interaction with WebSocket events, 
+     * storage, and custom data management.
+     *
+     * @param {string} moduleName - The name of the module.
+     * @param {string} EXTENSION_ID - ID
+     * @returns {{
+     *   MODULE_NAME: string,
+     *   SOCKET: object,
+     *   PUBLIC: Object,
+     *   KEYBOARD_COMMANDS: Array<object>,
+     *   setStorage: (key: string, value: any, isGlobal: boolean) => Promise<object>,
+     *   getStorage: (key: string, isGlobal: boolean) => Promise<object>,
+     *   getVariable: (variableName: string, defaultValue: any, create: boolean, isGlobal: boolean) => Promise<any>,
+     *   setVariable: (variableName: string, value: any, isGlobal: boolean) => Promise<void>,
+     *   showMenu: (options: Array<object>) => void,
+     *   setMenuHandler: (handlerFunction: function) => void,
+     *   ioEmit: (eventName: string, data: object) => void,
+     *   register: (CTXAddons?: object) => Promise<void>
+     * }} - The context object with methods for WebSocket, storage, and custom data.
+    */
+    function createContext(moduleName, EXTENSION_ID) {
+        return window.WSACTION.createModuleContext(moduleName, EXTENSION_ID);
+    }
+    console.log(EXTENSION_ID)
+    const CONTEXT = createContext("${name.toUpperCase()}", EXTENSION_ID);
+    const SOCKET = CONTEXT.SOCKET;
+
+    /**
+     * Handles WebSocket connection to the server.
      */
-    async function MakeContext() {
-        const MODULE_NAME = "${name.toUpperCase()}";
-        const SOCKET = io(\`\${window.WSACTION.config.ip}:\${window.WSACTION.config.port}\`, { secure: false });
+    SOCKET.on('connect', () => {
+        console.log(\`\${CONTEXT.MODULE_NAME} Connected to WebSocket server\`);
+    });
 
-        const KEYBOARD_COMMANDS = [
-            {
-                description: "Nothing",
-                keys: [ 
-                    {
-                        key: "control", 
-                        upercase: false
-                    }
-                ]
-            }
-        ]
+    /**
+     * Handles WebSocket reconnection to the server.
+     */
+    SOCKET.on('reconnect', (attempt) => {
+        console.log(\`Reconnected to WebSocket server after \${attempt} attempts\`);
+    });
 
-        /**
-         * Stores a value in the module's storage.
-         * @param {string} key - The storage key.
-         * @param {any} value - The value to be stored.
-         * @returns {Promise<object>} - Result of the storage operation.
-         */
-        const setStorage = async (key, value) => {
-            return new Promise((resolve) => {
-                const timeout = setTimeout(() => {
-                    resolve({ success: false, error: 'Timeout: The operation took more than 10 seconds.' });
-                }, 10000);
+    /**
+     * Handles WebSocket disconnection from the server.
+     */
+    SOCKET.on('disconnect', () => {
+        console.log(\`\${CONTEXT.MODULE_NAME} Disconnected from WebSocket server\`);
+    });
 
-                socket.on(\`storage.store.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`, (data) => {
-                    clearTimeout(timeout);
-                    resolve(data);
-                });
+    /**
+     * Example event handler for receiving events from the WebSocket server.
+     */
+    SOCKET.on(\`message\`, (data) => {
+        console.log('Received event:', data);
+    });
 
-                SOCKET.emit('storage.store', {
-                    extension: MODULE_NAME,
-                    id: window.identifier,
-                    key,
-                    value,
-                    response: \`storage.store.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`
-                });
-            });
-        };
+    // Emit a simple event with a message
+    CONTEXT.ioEmit('sendMessage', { message: 'Hello WebSocket!' });
 
-        /**
-         * Loads a value from the module's storage.
-         * @param {string} key - The storage key.
-         * @returns {Promise<object>} - Result of the load operation.
-         */
-        const getStorage = async (key) => {
-            return new Promise((resolve) => {
-                const timeout = setTimeout(() => {
-                    resolve({ success: false, error: 'Timeout: The operation took more than 10 seconds.' });
-                }, 10000);
+    const NothingFunction = ()=>{}
 
-                socket.on(\`storage.load.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`, (data) => {
-                    clearTimeout(timeout);
-                    if (data.success) {
-                        resolve(data);
-                    } else {
-                        resolve({ success: false, error: 'Error loading storage' });
-                    }
-                });
+    /**
+     * Define keyboard commands for the module.
+     */
+    CONTEXT.KEYBOARD_COMMANDS = [
+        {
+            description: "Nothing", // Default description
+            keys: [
+                { key: "ctrlKey", case_sensitive: false },
+                { key: "altKey", case_sensitive: false },
+            ], // Default key binding
+            function: NothingFunction
+        }
+    ];
 
-                SOCKET.emit('storage.load', {
-                    extension: MODULE_NAME,
-                    id: window.identifier,
-                    key,
-                    response: \`storage.load.res.\${MODULE_NAME}.\${window.identifier}.\${key}\`
-                });
-            });
-        };
-
-        /**
-         * Gets the value of a stored variable, with an option to create it if it does not exist.
-         * @param {string} variableName - The variable name.
-         * @param {any} defaultValue - The default value if the variable does not exist.
-         * @param {boolean} create - Whether to create the variable if it does not exist.
-         * @returns {Promise<any>} - The value of the variable.
-         */
-        const getVariable = async (variableName, defaultValue, create = false) => {
-            const data = await getStorage(variableName);
-            if (!data.success && create) {
-                await setStorage(variableName, defaultValue);
-                return defaultValue;
-            } else if (data.success) {
-                return data.value;
-            } else {
-                return defaultValue;
-            }
-        };
-
-        /**
-         * Displays the menu with the provided options.
-         * This function is necessary for the injector to open the menu.
-         * @param {Array} options - The menu options.
-         */
-        const showMenu = function (options) {
-            console.log('Menu is shown with options:', options);
-        };
-
-        SOCKET.on('connect', () => {
-            console.log(\`\${MODULE_NAME} Connected to WebSocket server\`);
-
-            socket.on(\`\${MODULE_NAME}:event\`, (data) => {
-                console.log('Received event:', data);
-            });
-        });
-
-        SOCKET.on('disconnect', () => {
-            console.log(\`\${MODULE_NAME} Disconnected from WebSocket server\`);
-        });
-
-        return {
-            MODULE_NAME,
-            KEYBOARD_COMMANDS,
-            setStorage,
-            getStorage,
-            getVariable,
-            showMenu,
-            SOCKET
-        };
-    }
-
-    const context = await MakeContext();
-
-    // Register the extension in the global context
-    if (window.extensionContext) {
-        window.extensionContext.addExtension(context.MODULE_NAME, {
-            location: window.location,
-            ...context
-        });
-
-        // Register the extension in the control panel
-        // if (window.extensionContext.isExtensionLoaded(context)) {
-        //     window.extensionContext.emit('extensionLoaded', context.MODULE_NAME);
-        // }    
-    }
-})();
+    /**
+     * Register the module context globally and allow for additional properties via CTXAddons.
+     */
+    await CONTEXT.register();
+})(EXTENSION_ID, SHARED_CONTEXT);
     `;
 }
