@@ -69,7 +69,7 @@ const openChrome = (url: string) => {
                 console.log(chalk.red('Google Chrome não encontrado nos locais padrão.'));
             }
         } else if (platform === 'linux') {
-            browserOpened = true;
+            browserOpened = false;
         } else {
             console.log(chalk.red(`Sistema operacional não suportado: ${platform}`));
         }
@@ -77,7 +77,7 @@ const openChrome = (url: string) => {
         console.log(chalk.red(`Erro ao tentar abrir o navegador: ${error.message}`));
     }
 
-    if (!browserOpened && platform !== 'linux') {
+    if (!browserOpened) {
         console.log(chalk.blue(`Por favor, abra manualmente o seguinte URL: ${url}`));
     }
 };

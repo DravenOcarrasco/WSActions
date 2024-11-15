@@ -24,27 +24,36 @@ import ABOUT from './about';
 import ServerHandler from './ServerHandler';
 
 const IoPort = 9532;
-// Função para criar um atalho usando PowerShell
+// Função para criar um atalho ou script shell
 function createShortcut(
     executablePath: string, 
     shortcutName: string, 
     args: string, 
-    overwrite: boolean = false // Adiciona a opção de sobrescrever o atalho
+    overwrite: boolean = false // Opção para sobrescrever o atalho
 ): Promise<string> {
     const platform = process.platform;
     const currentDir = process.cwd();
 
     return new Promise((resolve, reject) => {
-        const shortcutPath = platform === 'win32' 
-            ? path.join(currentDir, `${shortcutName}.lnk`)
-            : platform === 'darwin'
-            ? path.join(currentDir, `${shortcutName}.alias`)
-            : path.join(currentDir, `${shortcutName}.desktop`);
+        let shortcutPath: string;
+        let scriptPath: string | undefined;
+
+        if (platform === 'win32') {
+            shortcutPath = path.join(currentDir, `${shortcutName}.lnk`);
+        } else if (platform === 'darwin') {
+            shortcutPath = path.join(currentDir, `${shortcutName}.alias`);
+        } else if (platform === 'linux') {
+            // Cria tanto o arquivo .desktop quanto o script shell no Linux
+            shortcutPath = path.join(currentDir, `${shortcutName}.desktop`);
+            scriptPath = path.join(currentDir, `${shortcutName}.sh`);
+        } else {
+            return reject(`Plataforma não suportada: ${platform}`);
+        }
 
         // Verifica se o atalho já existe
         if (fs.existsSync(shortcutPath)) {
             if (!overwrite) {
-                return resolve(`Shortcut ${shortcutName} already exists.`);
+                return resolve(`O atalho ${shortcutName} já existe.`);
             } else {
                 // Remove o atalho existente antes de criar um novo
                 fs.unlinkSync(shortcutPath);
@@ -64,9 +73,9 @@ function createShortcut(
             const encodedCommand = Buffer.from(powershellScript, 'utf16le').toString('base64');
             exec(`powershell -EncodedCommand ${encodedCommand}`, (error, stdout, stderr) => {
                 if (error) {
-                    reject(`Error creating shortcut: ${error}`);
+                    reject(`Erro ao criar atalho: ${error.message}`);
                 } else {
-                    resolve(`Shortcut ${shortcutName} created successfully.`);
+                    resolve(`Atalho ${shortcutName} criado com sucesso.`);
                 }
             });
         } else if (platform === 'darwin') {
@@ -79,28 +88,41 @@ function createShortcut(
             `;
             exec(`osascript -e '${applescript}'`, (error, stdout, stderr) => {
                 if (error) {
-                    reject(`Error creating shortcut: ${error}`);
+                    reject(`Erro ao criar atalho: ${error.message}`);
                 } else {
-                    resolve(`Shortcut ${shortcutName} created successfully.`);
+                    resolve(`Atalho ${shortcutName} criado com sucesso.`);
                 }
             });
         } else if (platform === 'linux') {
-            // Linux
+            if (!scriptPath) {
+                return reject('Caminho do script não definido no Linux.');
+            }
+            // Linux - Criar arquivo .desktop
             const desktopEntry = `[Desktop Entry]
-                Name=${shortcutName}
-                Exec=${executablePath} ${args}
-                Type=Application
-                Terminal=false
-            `;
+Name=${shortcutName}
+Exec="${scriptPath}"
+Type=Application
+Terminal=false
+`;
             fs.writeFile(shortcutPath, desktopEntry, { mode: 0o755 }, (err) => {
                 if (err) {
-                    reject(`Error creating shortcut: ${err}`);
+                    return reject(`Erro ao criar arquivo .desktop: ${err.message}`);
                 } else {
-                    resolve(`Shortcut ${shortcutName} created successfully.`);
+                    // Depois de criar o arquivo .desktop, criar o script shell
+                    const scriptContent = `#!/bin/bash
+"${executablePath}" ${args}
+`;
+                    fs.writeFile(scriptPath, scriptContent, { mode: 0o755 }, (err) => {
+                        if (err) {
+                            reject(`Erro ao criar script shell: ${err.message}`);
+                        } else {
+                            resolve(`Atalho ${shortcutName} criado com sucesso.`);
+                        }
+                    });
                 }
             });
         } else {
-            reject(`Unsupported platform: ${platform}`);
+            reject(`Plataforma não suportada: ${platform}`);
         }
     });
 }
