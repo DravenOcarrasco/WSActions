@@ -111,6 +111,38 @@ function sendReloadEvent() {
     document.dispatchEvent(event);
 }
 
+// === Gestão de CSP ===
+
+function initializeCSPToggle() {
+    const cspToggle = document.getElementById('disableCSP');
+    
+    // Carregar estado atual do storage local
+    chrome.storage.local.get(['disableCSP'], (result) => {
+        cspToggle.checked = result.disableCSP !== false;
+    });
+
+    // Listener para mudanças no toggle
+    cspToggle.addEventListener('change', function() {
+        const value = this.checked;
+        // Salvar no storage local
+        chrome.storage.local.set({ disableCSP: value }, () => {
+            // Enviar mensagem para o background script
+            chrome.runtime.sendMessage({
+                action: 'toggleCSP',
+                value: value
+            }, (response) => {
+                if (response && response.status === 'success') {
+                    console.log('CSP configuração atualizada:', value ? 'desativado' : 'ativado');
+                } else {
+                    console.error('Erro ao atualizar configuração CSP');
+                    // Reverter o toggle em caso de erro
+                    this.checked = !value;
+                }
+            });
+        });
+    });
+}
+
 // === Gestão de Extensões Permitidas ===
 
 function addExtensionToList(extensionName) {
@@ -181,6 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeStoredValues();
     initializeButtons();
     initializePopup();
+    initializeCSPToggle();
 });
 
 // Inicializa o identificador

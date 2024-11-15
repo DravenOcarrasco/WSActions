@@ -51,6 +51,7 @@ const serverInit = async (IoPort: number) => {
 const openChrome = (url: string) => {
     const platform = os.platform();
     let browserOpened = false;
+    
     try {
         if (platform === 'darwin') {
             spawn('open', ['-a', 'Google Chrome', url], { detached: true, stdio: 'ignore' }).unref();
@@ -60,9 +61,7 @@ const openChrome = (url: string) => {
                 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
                 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
             ];
-
             let chromePath = chromePaths.find((chromePath) => existsSync(chromePath));
-
             if (chromePath) {
                 spawn(chromePath, [url], { detached: true, stdio: 'ignore' }).unref();
                 browserOpened = true;
@@ -70,15 +69,15 @@ const openChrome = (url: string) => {
                 console.log(chalk.red('Google Chrome não encontrado nos locais padrão.'));
             }
         } else if (platform === 'linux') {
-            spawn('google-chrome', [url], { detached: true, stdio: 'ignore' }).unref();
+            browserOpened = true;
         } else {
             console.log(chalk.red(`Sistema operacional não suportado: ${platform}`));
         }
-    } catch (error) {
-        console.log(chalk.red('Erro ao tentar abrir o Google Chrome'));
+    } catch (error:any) {
+        console.log(chalk.red(`Erro ao tentar abrir o navegador: ${error.message}`));
     }
 
-    if (!browserOpened) {
+    if (!browserOpened && platform !== 'linux') {
         console.log(chalk.blue(`Por favor, abra manualmente o seguinte URL: ${url}`));
     }
 };
@@ -185,7 +184,7 @@ export default async (IoPort: number) => {
         console.log(chalk.red.bold('❌ Nenhum usuário registrado. Por favor, registre-se.'));
 
         console.log(chalk.blue('🚀 Iniciando servidor de registro na porta 9513...'));
-        app.listen(9513, async () => {
+        app.listen(9513,'0.0.0.0', async () => {
             console.log(chalk.green.bold(`✅ Servidor de registro iniciado com sucesso na porta ${chalk.bold('9513')}.`));
             console.log(chalk.blue('🌐 Abrindo navegador para registro...'));
             openChrome(`${config.dashboard_endpoint}`);

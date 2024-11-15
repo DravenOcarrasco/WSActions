@@ -189,6 +189,14 @@ function createModuleContext(name, ID ="ALL") {
         }, "*");
     }
 
+    function setCustomData(key, value){
+        PUBLIC[key] = value;
+    }
+
+    function getCustomData(key){
+        return PUBLIC[key]
+    }
+
     const CONTEXT = {
         MODULE_NAME,
         SOCKET,
@@ -201,18 +209,61 @@ function createModuleContext(name, ID ="ALL") {
         getVariable,
         setVariable,
         showMenu,
-        setMenuHandler
+        setMenuHandler,
+        setCustomData,
+        getCustomData
     };
 
-    const register = async (CTXAddons = {})=>{
+    const register = async (CTXAddons = {}) => {
         if (window.WSACTION.CONTEXT_MANAGER) {
             window.WSACTION.CONTEXT_MANAGER.addExtension(CONTEXT.MODULE_NAME, {
                 location: window.location,
                 ...CONTEXT,
                 ...CTXAddons
-            });   
+            });
         }
-    }
+    
+        try {
+            // Define todas as possíveis teclas relevantes
+            const specialKeys = {
+                ctrlKey: (event) => event.ctrlKey,
+                altKey: (event) => event.altKey,
+                shiftKey: (event) => event.shiftKey,
+                metaKey: (event) => event.metaKey
+            };
+        
+            // Itera sobre os comandos definidos
+            for (let command of CONTEXT.KEYBOARD_COMMANDS) {
+                document.addEventListener("keydown", (event) => {
+                    // Verifica se todas as teclas definidas no comando foram pressionadas
+                    const allKeysMatch = command.keys.every((key) => {
+                        // Verifica se é uma tecla especial (ctrl, alt, shift, meta)
+                        if (specialKeys[key.key]) {
+                            return specialKeys[key.key](event);
+                        }
+        
+                        // Normaliza a tecla para comparação, dependendo de `case_sensitive`
+                        const normalizedKey = key.case_sensitive ? key.key : key.key.toLowerCase();
+                        const eventKey = key.case_sensitive ? event.key : event.key.toLowerCase();
+                        const eventCode = key.case_sensitive ? event.code : event.code.toLowerCase();
+        
+                        return eventKey === normalizedKey || eventCode === normalizedKey;
+                    });
+        
+                    if (allKeysMatch) {
+                        if (typeof command.function === "function") {
+                            event.preventDefault(); // Evita comportamentos padrão, se necessário
+                            command.function(); // Executa a função associada ao comando
+                        } else {
+                            console.warn(`No function assigned for command: ${command.description}`);
+                        }
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("Error registering keyboard commands:", error);
+        }
+    };
     
     CONTEXT.register = register;
     // Return the context object, which includes methods, properties, and the customData storage

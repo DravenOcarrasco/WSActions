@@ -1,6 +1,101 @@
+// Inicializa as configurações padrão e aplica regras CSP imediatamente
 chrome.runtime.onInstalled.addListener(() => {
     console.log("Extensão instalada");
+    // Define disableCSP como true por padrão e aplica as regras
+    chrome.storage.local.set({ disableCSP: true }, () => {
+        setupCSPRules(true);
+    });
 });
+
+// Aplica as regras CSP ao iniciar o navegador baseado na configuração salva
+chrome.runtime.onStartup.addListener(() => {
+    chrome.storage.local.get(['disableCSP'], (result) => {
+        setupCSPRules(result.disableCSP !== false);
+    });
+});
+
+// Aplica regras CSP em cada navegação baseado na configuração salva
+chrome.webNavigation.onCommitted.addListener((details) => {
+    // Ignora frames filhos, apenas aplica na página principal
+    if (details.frameId === 0) {
+        chrome.storage.local.get(['disableCSP'], (result) => {
+            setupCSPRules(result.disableCSP !== false);
+        });
+    }
+});
+
+// Listener para mudanças na configuração via popup
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'toggleCSP') {
+        chrome.storage.local.set({ disableCSP: request.value }, () => {
+            setupCSPRules(request.value);
+            sendResponse({ status: 'success' });
+        });
+        return true;
+    }
+    handleMessage(request, sendResponse);
+    return true;
+});
+
+async function setupCSPRules(enable) {
+    try {
+        if (enable) {
+            await chrome.declarativeNetRequest.updateDynamicRules({
+                removeRuleIds: [1, 2],
+                addRules: [
+                    {
+                        "id": 1,
+                        "priority": 1,
+                        "action": {
+                            "type": "modifyHeaders",
+                            "responseHeaders": [
+                                {
+                                    "header": "content-security-policy",
+                                    "operation": "remove"
+                                },
+                                {
+                                    "header": "content-security-policy-report-only",
+                                    "operation": "remove"
+                                }
+                            ]
+                        },
+                        "condition": {
+                            "urlFilter": "*",
+                            "resourceTypes": ["main_frame", "sub_frame", "script"]
+                        }
+                    },
+                    {
+                        "id": 2,
+                        "priority": 2,
+                        "action": {
+                            "type": "modifyHeaders",
+                            "responseHeaders": [
+                                {
+                                    "header": "access-control-allow-origin",
+                                    "operation": "set",
+                                    "value": "*"
+                                }
+                            ]
+                        },
+                        "condition": {
+                            "urlFilter": "||127.0.0.1:9514/*",
+                            "resourceTypes": ["script"]
+                        }
+                    }
+                ]
+            });
+            console.log("CSP rules enabled successfully");
+        } else {
+            await chrome.declarativeNetRequest.updateDynamicRules({
+                removeRuleIds: [1, 2],
+                addRules: []
+            });
+            console.log("CSP rules disabled successfully");
+        }
+    } catch (error) {
+        console.error("Error updating CSP rules:", error);
+    }
+}
 
 // Listener para mensagens internas (do content script)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -72,10 +167,23 @@ function handleMessage(request, sendResponse) {
         case 'close_page':
             handleClosePage(request, sendResponse);
             break;
+        case 'toggleCSP':
+            handleToggleCSP(request, sendResponse);
+            break;
         default:
             sendResponse({ status: 'error', message: 'Ação desconhecida' });
             break;
     }
+}
+
+/**
+ * Função para lidar com a ação de toggle do CSP
+ */
+function handleToggleCSP(request, sendResponse) {
+    chrome.storage.local.set({ disableCSP: request.value }, () => {
+        setupCSPRules(request.value);
+        sendResponse({ status: 'success', message: `CSP ${request.value ? 'desativado' : 'ativado'} com sucesso!` });
+    });
 }
 
 /**

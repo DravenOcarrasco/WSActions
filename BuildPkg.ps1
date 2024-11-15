@@ -34,32 +34,61 @@ Write-Host "Version detected: $version"
 # Transpila o TypeScript usando tsc
 Write-Host "Transpiling TypeScript to JavaScript using tsc..."
 npx tsc
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Transpilation failed."
+    exit 1
+}
 Write-Host "Transpilation completed using tsc."
 
-# Compila o projeto usando o pkg e inclui a versão no nome do arquivo de saída
-Write-Host "Compiling the project with pkg..."
-pkg package.json --output build/WSAction-$version
-Write-Host "Executable created with pkg."
+# Compila o projeto usando o pkg para Windows e Linux
+Write-Host "Compiling the project with pkg for Windows and Linux..."
 
-# Verifica se o WSActions-$version.exe (ou apenas WSActions-$version) existe antes de mover
-if (Test-Path ".\build\WSAction-$version.exe") {
-    Write-Host "WSActions-$version.exe successfully created in the 'build' directory."
-} else {
-    Write-Host "WSActions-$version.exe not found. Ensure pkg was able to generate the executable."
+# Definir os targets desejados
+$targets = @("node18-win-x64", "node16-linux-x64")
+
+foreach ($target in $targets) {
+    # Define a extensão do executável com base no target
+    switch ($target) {
+        "node18-win-x64" { $ext = ".exe" }
+        "node16-linux-x64" { $ext = "" }
+        default { $ext = "" }
+    }
+    $outputName = "WSAction-$version-$target$ext"
+    pkg package.json --targets $target --output "build\$outputName"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "pkg compilation failed for target $target."
+        exit 1
+    }
+    Write-Host "Executable for $target created: build\$outputName"
+}
+
+# Verifica se os executáveis foram criados
+$executables = @("WSAction-$version-node18-win-x64.exe", "WSAction-$version-node16-linux-x64")
+$allExist = $true
+foreach ($exe in $executables) {
+    if (!(Test-Path ".\build\$exe")) {
+        Write-Host "$exe not found. Ensure pkg was able to generate the executable."
+        $allExist = $false
+    } else {
+        Write-Host "$exe successfully created in the 'build' directory."
+    }
+}
+if (-not $allExist) {
     exit 1
 }
 
 # Copia arquivos necessários para a pasta de build
 $filesToCopy = @('UnsecureChromium.bat', 'public', 'extensions', 'scripts', 'ChromeExtension')
 foreach ($file in $filesToCopy) {
-    Copy-Item -Recurse -Path $file -Destination build\$file
-    Write-Host "'$file' copied to 'build' directory."
+    if (Test-Path $file) {
+        Copy-Item -Recurse -Path $file -Destination build\$file
+        Write-Host "'$file' copied to 'build' directory."
+    } else {
+        Write-Host "Warning: '$file' does not exist and was not copied."
+    }
 }
 
-# Copia node_modules e package.json para a pasta build
-# Copy-Item -Recurse -Path node_modules -Destination build\node_modules
-# Write-Host "'node_modules' copied to 'build'."
-
+# Copia package.json para a pasta build
 Copy-Item -Path package.json -Destination build\package.json
 Write-Host "'package.json' copied to 'build'."
 
@@ -80,10 +109,12 @@ if (Test-Path build) {
     Write-Host "Build directory not found, skipping zipping process."
 }
 
-# Remove o WSActions.exe da raiz após o processo (se existir algum na raiz)
-if (Test-Path WSActions.exe) {
-    Remove-Item -Path WSActions.exe -Force
-    Write-Host "WSActions.exe removed from the root directory."
+# Remove os executáveis da raiz após o processo (se existirem na raiz)
+foreach ($exe in $executables) {
+    if (Test-Path $exe) {
+        Remove-Item -Path $exe -Force
+        Write-Host "$exe removed from the root directory."
+    }
 }
 
 Write-Host "Build process completed successfully."

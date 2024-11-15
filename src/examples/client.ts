@@ -39,16 +39,6 @@ export default function mount(name: string) {
     const SOCKET = CONTEXT.SOCKET;
 
     /**
-     * Define keyboard commands for the module.
-     */
-    CONTEXT.KEYBOARD_COMMANDS = [
-        {
-            description: "Nothing", // Default description
-            keys: [{ key: "control", uppercase: false }] // Default key binding
-        }
-    ];
-
-    /**
      * Handles WebSocket connection to the server.
      */
     SOCKET.on('connect', () => {
@@ -78,6 +68,22 @@ export default function mount(name: string) {
 
     // Emit a simple event with a message
     CONTEXT.ioEmit('sendMessage', { message: 'Hello WebSocket!' });
+
+    const NothingFunction = ()=>{}
+
+    /**
+     * Define keyboard commands for the module.
+     */
+    CONTEXT.KEYBOARD_COMMANDS = [
+        {
+            description: "Nothing", // Default description
+            keys: [
+                { key: "ctrlKey", case_sensitive: false },
+                { key: "altKey", case_sensitive: false },
+            ], // Default key binding
+            function: NothingFunction
+        }
+    ];
 
     /**
      * Register the module context globally and allow for additional properties via CTXAddons.

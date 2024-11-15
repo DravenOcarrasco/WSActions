@@ -9,7 +9,9 @@
         "activeTab",
         "scripting",
         "proxy",
-        "webRequest"
+        "webRequest",
+        "declarativeNetRequest",
+        "webNavigation"
     ],
     "action": {
         "default_popup": "popup.html",
@@ -39,6 +41,13 @@
             "matches": ["<all_urls>"]
         }
     ],
+    "declarative_net_request": {
+        "rule_resources": [{
+            "id": "ruleset_1",
+            "enabled": true,
+            "path": "rules.json"
+        }]
+    },
     "content_security_policy": {
         "extension_pages": "script-src 'self'; object-src 'self'"
     },

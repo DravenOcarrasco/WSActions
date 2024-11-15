@@ -64,7 +64,7 @@ io.on('connection', (socket) => {
 initRelay(io);
 
 // Iniciando os servidores WebSocket
-httpServerWS.listen(config.http.port, () => {
+httpServerWS.listen(config.http.port, '0.0.0.0', () => {
     console.log(chalk.green(`HTTP Server running at http://127.0.0.1:${config.http.port}`));
 });
 

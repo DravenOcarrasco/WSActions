@@ -86,7 +86,7 @@ export async function createSeparateWebSocketServer(port: number): Promise<{ io:
             });
 
             // Iniciar o servidor HTTP na porta fornecida
-            httpServer.listen(port, () => {
+            httpServer.listen(port, '0.0.0.0',() => {
                 resolve({ io, server: httpServer }); // Retornar a instância do servidor Socket.IO e HTTP
             });
 
