@@ -455,14 +455,13 @@ const ModuleController = (() => {
         if(!id || id === ""){
             id = "ALL"
         }
+        socket.join([id as string])
         // Inicializa os eventos IO específicos para o socket
         EXTENSIONS.ENABLED.forEach(EXT => {
             Object.entries(EXT.IOEVENTS).forEach(([event, handler]) => {
-                socket.on(`${EXT.NAME}.${event}`, handler._function);
+                socket.on(`${event}`, handler._function);
             });
         });
-
-        socket.join(id as string)
     }
 
     return {

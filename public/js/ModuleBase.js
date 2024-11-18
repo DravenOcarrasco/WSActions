@@ -38,8 +38,7 @@ function createModuleContext(name, ID ="ALL") {
      * @param {object} data - The data to be sent with the event.
      */
     function ioEmit(event, data) {
-        const eventName = `${MODULE_NAME}.${event}`;  // Format the event name with the module name prefix
-        SOCKET.emit(eventName, data);  // Emit the event via WebSocket
+        SOCKET.emit(event, data);  // Emit the event via WebSocket
     }
 
     /**
