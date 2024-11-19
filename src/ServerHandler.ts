@@ -1,4 +1,4 @@
-import { existsSync, unlinkSync } from 'fs';
+import { existsSync } from 'fs';
 import express from 'express';
 import { spawn } from 'child_process';
 import { createSeparateWebSocketServer } from './modules/cli-websocket';
@@ -9,9 +9,7 @@ import { createOrLoadIdentityFile, updateIdentityFile } from './utils/identity';
 import { prepareExtensions } from './utils/extensionManager';
 import chalk from 'chalk';
 import figlet from 'figlet';
-import ABOUT from './about';
 import path from 'path';
-import extensions from './extenssionLoader';
 
 const app = express();
 app.use(express.json());
@@ -125,11 +123,9 @@ const restartProcess = (shortcutName: string) => {
 
     if (isWindows) {
         console.log(chalk.blue(`Reiniciando processo no Windows usando o atalho ${shortcutName}.lnk...`));
-        // Executa o atalho diretamente
         startProcess('explorer', [shortcutPath]);
     } else if (isLinux) {
         console.log(chalk.blue(`Reiniciando processo no Linux usando o atalho ${shortcutName}.desktop...`));
-        // Executa o atalho diretamente no Linux
         startProcess('xdg-open', [shortcutPath]);
     } else {
         console.error(chalk.red('Sistema operacional não suportado.'));
@@ -147,7 +143,7 @@ app.post('/register', (req, res) => {
     console.log(chalk.green(`WSACTION PREPARADO!`));
 
     setTimeout(() => {
-        restartProcess('Run-Server');  // Reiniciar o processo em vez de fechar
+        restartProcess('Run-Server');
     }, 3000);
 });
 
@@ -163,19 +159,15 @@ export default async (IoPort: number) => {
         console.log(chalk.blue('🔄 Sincronizando dados...'));
         console.log(chalk.blue('🔧 Preparando extensões...'));
 
-        // Definir a função reloadModules
         const reloadModules = () => {
-            // restartProcess();
+            // Função vazia pois o processo será reiniciado
         };
 
-        // Passar user_id e reloadModules para prepareExtensions
         await prepareExtensions(user_id as string, reloadModules);
 
         console.log(chalk.green.bold('✅ Extensões carregadas com sucesso!'));
 
-        // O processo será reiniciado após a atualização das extensões
-        // Portanto, o código abaixo pode não ser executado no processo atual
-        const { default: api } = await import('./api');
+        const { default: server } = await import('./server');
         console.log(chalk.blue(`🚀 Iniciando servidor na porta ${chalk.bold(IoPort.toString())}...`));
         await serverInit(IoPort);
 
@@ -184,11 +176,10 @@ export default async (IoPort: number) => {
         console.log(chalk.red.bold('❌ Nenhum usuário registrado. Por favor, registre-se.'));
 
         console.log(chalk.blue('🚀 Iniciando servidor de registro na porta 9513...'));
-        app.listen(9513,'0.0.0.0', async () => {
+        app.listen(9513, '0.0.0.0', async () => {
             console.log(chalk.green.bold(`✅ Servidor de registro iniciado com sucesso na porta ${chalk.bold('9513')}.`));
             console.log(chalk.blue('🌐 Abrindo navegador para registro...'));
             openChrome(`${config.dashboard_endpoint}`);
         });
     }
 };
-

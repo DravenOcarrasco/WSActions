@@ -2,7 +2,9 @@ import {
     existsSync,
     mkdirSync,
     createWriteStream,
-    createReadStream
+    createReadStream,
+    unlinkSync,
+    rmSync
 } from 'fs';
 import path from 'path';
 import unzipper from 'unzipper';
@@ -10,6 +12,26 @@ import archiver from 'archiver';
 import os from 'os';
 
 export const backupDir = path.resolve(os.tmpdir(), 'wsaction-extensions-backup');
+
+// Function to remove a file
+export const removeFile = (filePath: string): void => {
+    if (existsSync(filePath)) {
+        unlinkSync(filePath);
+        console.log(`File ${filePath} has been removed.`);
+    } else {
+        console.warn(`File ${filePath} does not exist.`);
+    }
+};
+
+// Function to remove a directory and its contents
+export const removeDirectory = (dirPath: string): void => {
+    if (existsSync(dirPath)) {
+        rmSync(dirPath, { recursive: true, force: true });
+        console.log(`Directory ${dirPath} has been removed.`);
+    } else {
+        console.warn(`Directory ${dirPath} does not exist.`);
+    }
+};
 
 // Function to zip an extension
 export const zipExtension = (extensionDir: string, extensionName: string): Promise<void> => {

@@ -32,7 +32,10 @@ export const registerStorageHandlers = (
 export const initIoToSocket = (socket: Socket, EXTENSIONS: Extension[]) => {
     // Get `id` from handshake
     var { id } = socket.handshake.query;
-    if(!id || id === "") {
+    if(
+        !id ||
+        id === ""
+    ) {
         id = "ALL";
     }
     socket.join([id as string]);
