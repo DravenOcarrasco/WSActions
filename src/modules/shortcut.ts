@@ -67,8 +67,9 @@ const createShortcutWithStringRunStyle = (options: Omit<ShortcutOptions, 'runSty
     });
 };
 
+// Para:
 export {
     createShortcut,
-    createShortcutWithStringRunStyle,
-    ShortcutOptions
+    createShortcutWithStringRunStyle
 };
+export type { ShortcutOptions };

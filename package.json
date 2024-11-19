@@ -14,14 +14,16 @@
       "tsc-build/src/setup.js",
       "node_modules/puppeteer-extra/**/*",
       "node_modules/puppeteer-extra-plugin-stealth/**/*",
-      "node_modules/axios/dist/node/axios.cjs"
+      "node_modules/axios/dist/node/axios.cjs",
+      "node_modules/chalk/**/*.js"
     ],
     "assets": [
       "node_modules/puppeteer/.local-chromium/**/*",
       "node_modules/puppeteer-extra-plugin-stealth/evasions/**/*",
       "node_modules/puppeteer-extra-plugin-stealth/**/*",
       "node_modules/puppeteer-extra-plugin-stealth/evasions/**/*.js",
-      "node_modules/figlet/fonts/Standard.flf"
+      "node_modules/figlet/fonts/Standard.flf",
+      "node_modules/chalk/**/*"
     ],
     "targets": [
       "node18-win-x64",
@@ -52,15 +54,19 @@
   },
   "dependencies": {
     "@cloudflare/puppeteer": "^0.0.11",
+    "@types/blessed": "^0.1.25",
     "@types/unzipper": "^0.10.10",
     "@types/yargs": "^17.0.33",
     "archiver": "^7.0.1",
     "axios": "^1.7.7",
+    "blessed": "^0.1.81",
+    "boxen": "^6.2.1",
     "cli-table3": "^0.6.5",
     "cloudflare-puppeteer-extra": "^1.0.1",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "figlet": "^1.7.0",
+    "gradient-string": "^3.0.0",
     "inquirer": "^11.1.0",
     "node-schedule": "^2.1.1",
     "open": "^10.1.0",

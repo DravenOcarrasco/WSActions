@@ -191,7 +191,7 @@ storage.json
 config.json
 open-chrome.lnk
 Run-Server.lnk
-
+Create-Extension.lnk
 
 build-with-node-modules
 WSAction_build_with_node_modules
@@ -200,7 +200,7 @@ WSAction_build.zip
 WSActions.exe
 identity.bin
 WSAction_build_*-ALPHA.zip
-WSAction_build_*-BETA.zip
+WSAction_build_*
 TEMP
 
 extensions

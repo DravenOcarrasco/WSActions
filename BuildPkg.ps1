@@ -39,7 +39,6 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 Write-Host "Transpilation completed using tsc."
-
 # Compila o projeto usando o pkg para Windows e Linux
 Write-Host "Compiling the project with pkg for Windows and Linux..."
 

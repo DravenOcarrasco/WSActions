@@ -14,7 +14,6 @@ export class CLIManager {
             input: process.stdin,
             output: process.stdout
         });
-
         this.setupCommandHandler();
     }
 
@@ -23,17 +22,40 @@ export class CLIManager {
         this.showMenu();
     }
 
+    private wrapBox(text: string, borderColor: string = 'cyan'): string {
+        const lines = text.split('\n').map(line => line.replace(/\s+$/, ''));  // Remove trailing spaces
+        const contentWidth = Math.max(...lines.map(line => {
+            // Calculate visual length considering ANSI escape codes
+            const strippedLine = line.replace(/\u001b\[[0-9;]*m/g, '');
+            return strippedLine.length;
+        }));
+        
+        const horizontal = '─'.repeat(contentWidth + 4);
+        const top = `┌${horizontal}┐`;
+        const bottom = `└${horizontal}┘`;
+        
+        const wrapped = lines.map(line => {
+            const strippedLine = line.replace(/\u001b\[[0-9;]*m/g, '');
+            const padding = ' '.repeat(contentWidth - strippedLine.length);
+            return `│  ${line}${padding}  │`;
+        }).join('\n');
+    
+        return `${top}\n${wrapped}\n${bottom}`;
+    }
+
     private setupCommandHandler() {
         this.rl.on('line', (input) => {
             const option = input.trim();
             const selectedOption = Number(option);
+            const maxOption = Object.keys(this.ExtensionsMenu).length + 1;
 
-            if (selectedOption === Object.keys(this.ExtensionsMenu).length + 1) {
-                console.log(chalk.red('\n👋 Encerrando...\n'));
+            if (selectedOption === maxOption) {
+                console.log(this.wrapBox(chalk.red('👋 Encerrando...')));
                 this.rl.close();
                 process.exit(0);
             } else if (!this.ExtensionsMenu[selectedOption]) {
-                console.log(chalk.red('\n❌ Opção inválida. Tente novamente.\n'));
+                console.log(this.wrapBox(chalk.red('❌ Opção inválida. Tente novamente.')));
+                console.clear();
                 this.showMenu();
             } else {
                 this.ExtensionsMenu[selectedOption]();
@@ -41,28 +63,18 @@ export class CLIManager {
         });
     }
 
-    private showMenu() {
-        console.clear(); // Limpa o terminal para melhor visualização
-
-        // Header
-        const headerBorder = '━'.repeat(60);
-        console.log(chalk.cyan(headerBorder));
-        console.log(chalk.bold.magentaBright(`
+    private renderLogo(): string {
+        return chalk.cyan(`
    ██╗    ██╗███████╗     █████╗  ██████╗████████╗██╗ ██████╗ ███╗   ██╗
    ██║    ██║██╔════╝    ██╔══██╗██╔════╝╚══██╔══╝██║██╔═══██╗████╗  ██║
    ██║ █╗ ██║███████╗    ███████║██║        ██║   ██║██║   ██║██╔██╗ ██║
    ██║███╗██║╚════██║    ██╔══██║██║        ██║   ██║██║   ██║██║╚██╗██║
    ╚███╔███╔╝███████║    ██║  ██║╚██████╗   ██║   ██║╚██████╔╝██║ ╚████║
     ╚══╝╚══╝ ╚══════╝    ╚═╝  ╚═╝ ╚═════╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝
-`));
-        console.log(chalk.cyan(headerBorder));
+        `);
+    }
 
-        // Versão e GitHub
-        console.log(chalk.bold.blueBright(`\n  🚀 Versão: ${chalk.white(ABOUT.VERSION)}`));
-        console.log(chalk.bold.blueBright(`  🔗 GitHub: ${chalk.underline.white(ABOUT.GIT)}\n`));
-        console.log(chalk.cyan(headerBorder));
-
-        // Status das Extensões
+    private renderExtensionStatus(): string {
         const enabledExtensions = ModuleController.EXTENSIONS.ENABLED.length > 0
             ? ModuleController.EXTENSIONS.ENABLED.map(ext => ext.NAME).join(', ')
             : 'Nenhuma';
@@ -71,39 +83,53 @@ export class CLIManager {
             ? ModuleController.EXTENSIONS.DISABLED.map(ext => ext.NAME).join(', ')
             : 'Nenhuma';
 
-        console.log(chalk.bold('\n  📊 Status das Extensões\n'));
-        console.log(`  ${chalk.bold.green('✓')} Ativas:    ${chalk.green(enabledExtensions)}`);
-        console.log(`  ${chalk.bold.red('✗')} Inativas:  ${chalk.red(disabledExtensions)}\n`);
-        console.log(chalk.cyan(headerBorder));
+        return this.wrapBox(
+            `${chalk.bold('📊 Status das Extensões')}\n\n` +
+            `${chalk.bold.green('✓')} Ativas:   ${chalk.green(enabledExtensions)}\n` +
+            `${chalk.bold.red('✗')} Inativas: ${chalk.red(disabledExtensions)}`
+        );
+    }
 
-        // Menu de Opções
-        console.log(chalk.bold.yellow('\n  🎯 Menu de Opções\n'));
-        
-        this.ExtensionsMenu = {};
+    private renderCommands(): { menuText: string; menuOptions: Record<number, Function> } {
+        const menuOptions: Record<number, Function> = {};
+        let menuText = chalk.bold.yellow('\n🎯 Menu de Opções\n\n');
         let optionNumber = 1;
 
-        // Adicionar comandos das extensões ao menu
         for (const [extension, commands] of Object.entries(ModuleController.COMMANDS.CLI)) {
-            console.log(chalk.bold.cyan(`\n  📦 Extensão: ${chalk.white(extension)}`));
-            console.log(chalk.cyan('  ' + '─'.repeat(40)));
-            
+            menuText += chalk.bold.cyan(`\n📦 ${chalk.white(extension)}\n`);
+            menuText += chalk.cyan('─'.repeat(40) + '\n');
+
             for (const [event, command] of Object.entries(commands)) {
                 const paddedNumber = optionNumber.toString().padStart(2, '0');
-                console.log(`  ${chalk.yellow(`${paddedNumber}.`)} ${chalk.green(event)}`);
-                console.log(`     ${chalk.white((command as any).description)}`);
-                this.ExtensionsMenu[optionNumber] = command._function;
+                menuText += `${chalk.yellow(`${paddedNumber}.`)} ${chalk.green(event)}\n`;
+                menuText += `    ${chalk.white((command as any).description)}\n`;
+                menuOptions[optionNumber] = command._function;
                 optionNumber++;
             }
         }
 
-        // Opção para sair
         const exitNumber = optionNumber.toString().padStart(2, '0');
-        console.log(chalk.cyan('\n  ' + '─'.repeat(40)));
-        console.log(`  ${chalk.yellow(`${exitNumber}.`)} ${chalk.red('Sair')}\n`);
-        console.log(chalk.cyan(headerBorder));
+        menuText += chalk.cyan('\n' + '─'.repeat(40) + '\n');
+        menuText += `${chalk.yellow(`${exitNumber}.`)} ${chalk.red('Sair')}\n`;
+
+        return { menuText, menuOptions };
+    }
+
+    private showMenu() {
+        const headerText = `
+            🚀 Versão: ${chalk.white(ABOUT.VERSION)}
+            🔗 GitHub: ${chalk.underline.white(ABOUT.GIT)}
+        `;
         
-        // Prompt
-        console.log(chalk.bold.green('\n  Digite uma opção: '));
+        console.log(this.renderLogo());
+        console.log(this.wrapBox(headerText));
+        console.log(this.renderExtensionStatus());
+
+        const { menuText, menuOptions } = this.renderCommands();
+        console.log(this.wrapBox(menuText));
+        
+        this.ExtensionsMenu = menuOptions;
+        console.log(chalk.bold.green('\nDigite uma opção: '));
     }
 }
 
