@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "WSActions",
-    "version": "2.9",
+    "version": "2.10",
     "description": "Facilita a injeção de scripts personalizados para auxiliar em processos repetitivos entre vários navegadores.",
     "permissions": [
         "tabs",
@@ -11,7 +11,8 @@
         "proxy",
         "webRequest",
         "declarativeNetRequest",
-        "webNavigation"
+        "webNavigation",
+        "debugger"
     ],
     "action": {
         "default_popup": "popup.html",

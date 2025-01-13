@@ -114,9 +114,15 @@ async function launchChrome(profileName: string, extensions: string[], profileIn
         '--disable-setuid-sandbox',
         '--enable-gpu',
         `--disable-extensions-except=${extensionPaths}`,
-        '--disable-infobars'
+        '--disable-infobars',
+        '--disable-software-rasterizer',
+        '--disable-dev-shm-usage',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-popup-blocking',
+        '--no-default-browser-check',
+        '--disable-infobars',
+        '--no-first-run'
     ];
-
     if (profileInfo.proxy?.enabled) {
         args.push(`--proxy-server=${profileInfo.proxy.ip}`);
     }

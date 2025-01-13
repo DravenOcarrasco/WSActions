@@ -14,6 +14,47 @@ chrome.runtime.onStartup.addListener(() => {
     });
 });
 
+// Gerenciamento do Debugger
+let attachedTabs = new Set();
+
+// Função para anexar o debugger a uma aba
+async function attachDebugger(tabId) {
+    if (attachedTabs.has(tabId)) return;
+    
+    try {
+        await chrome.debugger.attach({ tabId }, '1.3');
+        attachedTabs.add(tabId);
+        console.log(`Debugger attached to tab ${tabId}`);
+    } catch (error) {
+        console.error('Error attaching debugger:', error);
+    }
+}
+
+// Função para desanexar o debugger de uma aba
+async function detachDebugger(tabId) {
+    if (!attachedTabs.has(tabId)) return;
+    
+    try {
+        await chrome.debugger.detach({ tabId });
+        attachedTabs.delete(tabId);
+        console.log(`Debugger detached from tab ${tabId}`);
+    } catch (error) {
+        console.error('Error detaching debugger:', error);
+    }
+}
+
+// Listener para comandos do debugger
+chrome.debugger.onEvent.addListener((source, method, params) => {
+    // Encaminha eventos do debugger para o content script
+    if (source.tabId) {
+        chrome.tabs.sendMessage(source.tabId, {
+            type: 'debugger_event',
+            method,
+            params
+        });
+    }
+});
+
 // Aplica regras CSP em cada navegação baseado na configuração salva
 chrome.webNavigation.onCommitted.addListener((details) => {
     // Ignora frames filhos, apenas aplica na página principal
@@ -24,17 +65,59 @@ chrome.webNavigation.onCommitted.addListener((details) => {
     }
 });
 
-// Listener para mudanças na configuração via popup
+// Listener para mensagens internas (do content script)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'toggleCSP') {
-        chrome.storage.local.set({ disableCSP: request.value }, () => {
-            setupCSPRules(request.value);
-            sendResponse({ status: 'success' });
-        });
-        return true;
+    // Tratamento específico para comandos do debugger
+    if (request.type === 'debugger_command') {
+        const tabId = sender.tab.id;
+        
+        if (request.action === 'attach') {
+            attachDebugger(tabId)
+                .then(() => sendResponse({ success: true }))
+                .catch(error => sendResponse({ success: false, error: error.message }));
+            return true;
+        }
+        
+        if (request.action === 'detach') {
+            detachDebugger(tabId)
+                .then(() => sendResponse({ success: true }))
+                .catch(error => sendResponse({ success: false, error: error.message }));
+            return true;
+        }
+        
+        if (request.action === 'sendCommand') {
+            chrome.debugger.sendCommand(
+                { tabId },
+                request.command,
+                request.params || {},
+                (result) => {
+                    if (chrome.runtime.lastError) {
+                        sendResponse({ success: false, error: chrome.runtime.lastError.message });
+                    } else {
+                        sendResponse({ success: true, result });
+                    }
+                }
+            );
+            return true;
+        }
     }
+
     handleMessage(request, sendResponse);
-    return true;
+    return true; // Permitir resposta assíncrona
+});
+
+// Listener para mensagens externas (opcional, se necessário)
+chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
+    handleMessage(request, sendResponse);
+    return true; // Permitir resposta assíncrona
+});
+
+chrome.runtime.onStartup.addListener(initializeProxy);
+// Listener para alterações de configuração de proxy
+chrome.storage.onChanged.addListener((changes) => {
+    if (changes.proxyMode || changes.proxyIP || changes.proxyPort) {
+        setProxyConfig();
+    }
 });
 
 async function setupCSPRules(enable) {
@@ -97,25 +180,6 @@ async function setupCSPRules(enable) {
     }
 }
 
-// Listener para mensagens internas (do content script)
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    handleMessage(request, sendResponse);
-    return true; // Permitir resposta assíncrona
-});
-
-// Listener para mensagens externas (opcional, se necessário)
-chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
-    handleMessage(request, sendResponse);
-    return true; // Permitir resposta assíncrona
-});
-
-chrome.runtime.onStartup.addListener(initializeProxy);
-// Listener para alterações de configuração de proxy
-chrome.storage.onChanged.addListener((changes) => {
-    if (changes.proxyMode || changes.proxyIP || changes.proxyPort) {
-        setProxyConfig();
-    }
-});
 
 // Função para definir o proxy com base no modo selecionado
 function setProxyConfig() {

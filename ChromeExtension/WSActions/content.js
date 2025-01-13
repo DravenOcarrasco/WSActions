@@ -5,6 +5,15 @@
 const MESSAGE_TYPES = {
     FROM_WSPAGE: "FROM_WSPAGE",
     FROM_EXTCHROME: "FROM_WSACTION_EXTCHROME",
+    DEBUGGER_COMMAND: "DEBUGGER_COMMAND",
+    DEBUGGER_EVENT: "DEBUGGER_EVENT"
+};
+
+const PERMISSION_TYPES = {
+    DEBUGGER: "debugger",
+    PAGE_CONTROL: "page_control",
+    KEYBOARD: "keyboard",
+    MOUSE: "mouse"
 };
 
 // =======================
@@ -55,11 +64,6 @@ function getValue(key) {
 /**
  * Injeta um script no documento para definir a variável window.identifier.
  * @param {Object} config - Configurações para o script.
- * @param {string} config.ip - Endereço IP do servidor.
- * @param {number} config.port - Porta do serviço.
- * @param {string} config.identifier - Identificador único.
- * @param {number} config.delay - Atraso para carregamento do client.js.
- * @param {Array<string>} config.allowedExtensionNames - Lista de nomes de extensões permitidas.
  */
 function injectIdentifierScript({ ip, port, identifier, delay, allowedExtensionNames }) {
     const scriptElement = document.createElement('script');
@@ -91,9 +95,6 @@ function injectIdentifierScript({ ip, port, identifier, delay, allowedExtensionN
 /**
  * Injeta o client.js no documento após um atraso especificado.
  * @param {Object} config - Configurações para o client.js.
- * @param {string} config.ip - Endereço IP do servidor.
- * @param {number} config.port - Porta do serviço.
- * @param {number} config.delay - Atraso para carregamento.
  */
 function injectClientScript({ ip, port, delay }) {
     setTimeout(() => {
@@ -109,6 +110,80 @@ function injectClientScript({ ip, port, delay }) {
             console.error('Erro ao carregar client.js');
         };
     }, delay || 1);
+}
+
+// =======================
+// Debugger Bridge
+// =======================
+
+/**
+ * Envia comando do debugger para o background script
+ * @param {string} action - Ação do debugger (attach, detach, sendCommand)
+ * @param {Object} params - Parâmetros adicionais
+ * @returns {Promise} Promessa que resolve com a resposta
+ */
+function sendDebuggerCommand(action, params = {}) {
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+            type: 'debugger_command',
+            action,
+            ...params
+        }, (response) => {
+            if (chrome.runtime.lastError) {
+                reject(chrome.runtime.lastError);
+            } else {
+                resolve(response);
+            }
+        });
+    });
+}
+
+// =======================
+// Sistema de Permissões
+// =======================
+
+/**
+ * Adiciona extensão à lista de pendentes
+ * @param {string} extensionName - Nome da extensão
+ * @param {Array<string>} permissions - Permissões solicitadas
+ */
+async function addToPendingList(extensionName, permissions) {
+    const pendingExtensions = await getValue('pendingExtensions') || {};
+    if (!pendingExtensions[extensionName]) {
+        pendingExtensions[extensionName] = {
+            requestedPermissions: permissions,
+            timestamp: Date.now()
+        };
+        await storeValue('pendingExtensions', pendingExtensions);
+        console.log(`Extensão ${extensionName} adicionada à lista de pendentes`);
+    }
+}
+
+/**
+ * Verifica permissões da extensão
+ * @param {string} extensionName - Nome da extensão
+ * @param {Array<string>} requiredPermissions - Permissões necessárias
+ * @returns {Promise<boolean>} Verdadeiro se tem permissão
+ */
+async function checkExtensionPermissions(extensionName, requiredPermissions) {
+    const extensionsPermissions = await getValue('extensionsPermissions') || {};
+    const extensionPermissions = extensionsPermissions[extensionName];
+
+    if (!extensionPermissions) {
+        await addToPendingList(extensionName, requiredPermissions);
+        return false;
+    }
+
+    const hasAllPermissions = requiredPermissions.every(
+        permission => extensionPermissions[permission]
+    );
+
+    if (!hasAllPermissions) {
+        await addToPendingList(extensionName, requiredPermissions);
+        return false;
+    }
+
+    return true;
 }
 
 // =======================
@@ -144,18 +219,6 @@ function normalizeURL(url) {
     }
 }
 
-/**
- * Verifica se a extensão está na lista de extensões permitidas.
- * @param {Array<string>} allowedExtensions - Lista de nomes de extensões permitidas.
- * @param {string} extensionName - Nome da extensão a ser verificada.
- * @returns {boolean} Verdadeiro se permitida, falso caso contrário.
- */
-function isExtensionAllowed(allowedExtensions, extensionName) {
-    return allowedExtensions.some(
-        (allowedName) => allowedName.toLowerCase() === extensionName.toLowerCase()
-    );
-}
-
 // =======================
 // Manipulação de Mensagens
 // =======================
@@ -165,15 +228,112 @@ function isExtensionAllowed(allowedExtensions, extensionName) {
  * @param {string} status - Status da resposta ('success' ou 'error').
  * @param {string} message - Mensagem detalhada.
  */
-function sendResponseToPage(status, message) {
+function sendResponseToPage(status, message, data = null) {
     window.postMessage(
         {
             type: MESSAGE_TYPES.FROM_EXTCHROME,
             status,
             message,
+            data
         },
         "*"
     );
+}
+
+/**
+ * Processa comandos do debugger
+ * @param {Object} data - Dados do comando
+ */
+async function processDebuggerCommand(data) {
+    try {
+        const { ext_name, action, command, params } = data;
+
+        if (!ext_name) {
+            throw new Error('Nome da extensão não fornecido');
+        }
+
+        // Verifica permissões para debugger
+        if (action === 'attach' || action === 'sendCommand') {
+            const hasPermission = await checkExtensionPermissions(ext_name, [PERMISSION_TYPES.DEBUGGER]);
+            if (!hasPermission) {
+                sendResponseToPage('error', `Extensão ${ext_name} aguardando aprovação para usar o debugger`);
+                return;
+            }
+        }
+
+        // Se for comando de teclado, verifica permissão específica
+        if (command === 'Input.dispatchKeyEvent') {
+            const hasPermission = await checkExtensionPermissions(ext_name, [PERMISSION_TYPES.KEYBOARD]);
+            if (!hasPermission) {
+                sendResponseToPage('error', `Extensão ${ext_name} aguardando aprovação para usar o teclado`);
+                return;
+            }
+        }
+
+        const response = await sendDebuggerCommand(action, { command, params });
+        sendResponseToPage(
+            response.success ? 'success' : 'error',
+            response.message || `Comando ${action} executado`,
+            response
+        );
+    } catch (error) {
+        console.error('Erro ao processar comando do debugger:', error);
+        sendResponseToPage('error', error.message);
+    }
+}
+
+/**
+ * Processa comandos de página
+ * @param {Object} data - Dados do comando
+ */
+async function processPageCommand(data) {
+    try {
+        const { ext_name, action, url, closeActiveTab, tabId } = data;
+
+        // Verifica permissão para controle de páginas
+        const hasPermission = await checkExtensionPermissions(ext_name, [PERMISSION_TYPES.PAGE_CONTROL]);
+        if (!hasPermission) {
+            sendResponseToPage('error', `Extensão ${ext_name} aguardando aprovação para controle de páginas`);
+            return;
+        }
+
+        // Validação da ação e URL
+        if (!action || !['open_page', 'change_page', 'close_page'].includes(action)) {
+            sendResponseToPage('error', 'Ação desconhecida ou não suportada.');
+            return;
+        }
+
+        if (['open_page', 'change_page'].includes(action) && !isValidURL(url)) {
+            sendResponseToPage('error', 'URL inválida ou não fornecida.');
+            return;
+        }
+
+        // Envia a mensagem para o background script
+        chrome.runtime.sendMessage(
+            {
+                action,
+                url,
+                closeActiveTab: closeActiveTab || false,
+                tabId: tabId || null,
+            },
+            (response) => {
+                if (chrome.runtime.lastError) {
+                    console.error('Erro na comunicação com o background script:', chrome.runtime.lastError);
+                    sendResponseToPage('error', 'Erro na comunicação com a extensão.');
+                    return;
+                }
+
+                if (response) {
+                    sendResponseToPage(response.status, response.message);
+                } else {
+                    sendResponseToPage('error', 'Nenhuma resposta recebida da extensão.');
+                }
+            }
+        );
+    } catch (error) {
+        console.error('Erro ao processar comando de página:', error);
+        sendResponseToPage('error', 'Erro interno ao processar a mensagem.');
+    }
 }
 
 /**
@@ -183,56 +343,15 @@ function sendResponseToPage(status, message) {
 async function messageListener(event) {
     // Verifica a origem da mensagem para segurança
     if (event.source !== window) return;
+
+    if (event.data && event.data.type === MESSAGE_TYPES.DEBUGGER_COMMAND) {
+        await processDebuggerCommand(event.data);
+        return;
+    }
+
     if (event.data && event.data.type === MESSAGE_TYPES.FROM_WSPAGE) {
-        try {
-            const { ext_name, action, url, closeActiveTab, tabId } = event.data;
-
-            // Validação da extensão
-            const allowedExtensions = await getValue('allowedExtensionNames');
-            const extensionsList = Array.isArray(allowedExtensions) ? allowedExtensions : [];
-
-            if (!isExtensionAllowed(extensionsList, ext_name)) {
-                console.warn(`${ext_name} Extension não permitida.`);
-                return;
-            }
-
-            // Validação da ação e URL
-            if (!action || !['open_page', 'change_page', 'close_page'].includes(action)) {
-                sendResponseToPage('error', 'Ação desconhecida ou não suportada.');
-                return;
-            }
-
-            if (['open_page', 'change_page'].includes(action) && !isValidURL(url)) {
-                sendResponseToPage('error', 'URL inválida ou não fornecida.');
-                return;
-            }
-
-            // Envia a mensagem para o background script
-            chrome.runtime.sendMessage(
-                {
-                    action,
-                    url,
-                    closeActiveTab: closeActiveTab || false,
-                    tabId: tabId || null,
-                },
-                (response) => {
-                    if (chrome.runtime.lastError) {
-                        console.error('Erro na comunicação com o background script:', chrome.runtime.lastError);
-                        sendResponseToPage('error', 'Erro na comunicação com a extensão.');
-                        return;
-                    }
-
-                    if (response) {
-                        sendResponseToPage(response.status, response.message);
-                    } else {
-                        sendResponseToPage('error', 'Nenhuma resposta recebida da extensão.');
-                    }
-                }
-            );
-        } catch (error) {
-            console.error('Erro ao processar a mensagem:', error);
-            sendResponseToPage('error', 'Erro interno ao processar a mensagem.');
-        }
+        await processPageCommand(event.data);
+        return;
     }
 }
 
@@ -269,6 +388,7 @@ async function initialize() {
         // Adiciona o listener para mensagens
         window.addEventListener("message", messageListener, false);
 
+        console.log('WSActions Bridge initialized');
     } catch (error) {
         console.error('Erro durante a inicialização:', error);
     }
