@@ -11,6 +11,7 @@ export default function mount(name: string) {
  * @param {Function} STORAGE.save - Função que salva o armazenamento.
  * @param {typeof import('express')} EXPRESS - Classe Express.
  * @param {Array<string>} [WEB_SCRIPTS=['client.js']] - Lista de scripts JavaScript a serem carregados dinamicamente.
+ * @param {Array<string>} [GLOBAL_SCRIPTS=[]] - Lista de scripts JavaScript a serem carregados dinamicamente em um contexto global.
  * @param {string} EXTENSION_PATH - Caminho absoluto para a pasta da extensão
  * 
  * @returns {{ start: Function, stop: Function }} - Objeto da extensão com funções \`start\` e \`stop\`.
@@ -21,7 +22,8 @@ module.exports = ({
     RL, 
     STORAGE, 
     EXPRESS, 
-    WEB_SCRIPTS = ['client.js'], 
+    WEB_SCRIPTS = ['client.js'],
+    GLOBAL_SCRIPTS = [],
     EXTENSION_PATH = '', 
     ID = ''
 }) => {
@@ -69,6 +71,7 @@ module.exports = ({
         CLIENT_LINK,
         EXTENSION_PATH,
         WEB_SCRIPTS,
+        GLOBAL_SCRIPTS,
         ID,
         onInitialize,
         onError

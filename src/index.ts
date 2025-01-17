@@ -151,7 +151,8 @@ async function createExtension(name: string) {
         compatibility: [`${ABOUT.VERSION}`],
         WEB_SCRIPTS : [
             'client.js'
-        ]
+        ],
+        GLOBAL_SCRIPTS: []
     });
 
     fs.writeFileSync(path.join(extensionDir, 'index.js'), indexFileContent.trim());

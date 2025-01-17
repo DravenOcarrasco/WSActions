@@ -11,7 +11,10 @@ export default function mount({
     id = generateUniqueId(),
     WEB_SCRIPTS = [
         'client.js'
-    ] as string[]
+    ] as string[],
+    GLOBAL_SCRIPTS = [
+    ] as string[],
+    
 } = {}) {
     return {
         name,
@@ -20,6 +23,7 @@ export default function mount({
         minVersion,
         compatibility,
         id,
-        WEB_SCRIPTS
+        WEB_SCRIPTS,
+        GLOBAL_SCRIPTS
     }
 }

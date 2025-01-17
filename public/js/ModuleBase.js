@@ -1,19 +1,40 @@
 /**
  * Function to create a module context with WebSocket, storage, and custom data capabilities.
- * @param {string} name - The name of the module.
+ * @param {string|object} nameOrConfig - Either the module name as a string or a configuration object
+ * @param {string} [nameOrConfig.name] - The name of the module when passing an object
+ * @param {string} [nameOrConfig.id] - The ID for the module when passing an object (defaults to "ALL")
+ * @param {string} [id="ALL"] - The ID parameter when using individual parameters
  * @returns {object} - The context object with methods for WebSocket, storage, and custom data.
  */
-function createModuleContext(name, ID ="ALL") {
-    // The module name in uppercase
-    const MODULE_NAME = name.toUpperCase();
+function createModuleContext(nameOrConfig, id = "ALL") {
+    // Handle both object and individual parameter cases
+    let MODULE_NAME;
+    let ID;
+    
+    if (typeof nameOrConfig === 'object' && nameOrConfig !== null) {
+        // Object parameter case
+        MODULE_NAME = nameOrConfig.name?.toUpperCase();
+        ID = nameOrConfig.id || "ALL";
+        
+        if (!MODULE_NAME) {
+            throw new Error("Module name is required when using object configuration");
+        }
+    } else {
+        // Individual parameters case
+        if (typeof nameOrConfig !== 'string') {
+            throw new Error("Module name must be a string when using individual parameters");
+        }
+        MODULE_NAME = nameOrConfig.toUpperCase();
+        ID = id;
+    }
     // Initialize WebSocket connection using global config, with `id` as a query parameter
     const SOCKET = io(`http://${window.WSACTION.config.ip}:${window.WSACTION.config.port}`, {
         secure: false,
-        query: { id: ID , moduleName: MODULE_NAME }
+        query: { id: ID, moduleName: MODULE_NAME }
     });
 
-    SOCKET.on("connect",()=>{
-        SOCKET.emit("join", {MODULE_NAME})
+    SOCKET.on("connect", () => {
+        SOCKET.emit("join", { MODULE_NAME })
     })
 
     SOCKET.on("reconnect", (attempt) => {
@@ -30,7 +51,7 @@ function createModuleContext(name, ID ="ALL") {
 
     // Custom data object where users can store anything they want
     const PUBLIC = {}
-    
+
     /**
      * Emit a WebSocket event with the module's name prefix.
      * This function ensures that the event name is formatted as `{MODULE_NAME}.evento`.
@@ -118,16 +139,16 @@ function createModuleContext(name, ID ="ALL") {
     async function getVariable(variableName, defaultValue, create = false, isGlobal = false) {
         // Try to get the value from storage
         const data = await getStorage(variableName, isGlobal);
-        
+
         // If not found and the create flag is set, store the default value
         if (!data.success && create) {
             await setStorage(variableName, defaultValue, isGlobal);
             return defaultValue;
-        } 
+        }
         // If found, return the value
         else if (data.success) {
             return data.value;
-        } 
+        }
         // Otherwise, return the default value
         else {
             return defaultValue;
@@ -152,7 +173,7 @@ function createModuleContext(name, ID ="ALL") {
 
 
     // Initial definition of the menu handler
-    var MENU_HANDLE = (options) => {};
+    var MENU_HANDLE = (options) => { };
 
     /**
      * Sets the menu handler function.
@@ -181,18 +202,18 @@ function createModuleContext(name, ID ="ALL") {
         }
     }
 
-    function sendChromeCommand(data){
+    function sendChromeCommand(data) {
         window.postMessage({
             ...data,
             ext_name: name
         }, "*");
     }
 
-    function setCustomData(key, value){
+    function setCustomData(key, value) {
         PUBLIC[key] = value;
     }
 
-    function getCustomData(key){
+    function getCustomData(key) {
         return PUBLIC[key]
     }
 
@@ -214,56 +235,116 @@ function createModuleContext(name, ID ="ALL") {
     };
 
     const register = async (CTXAddons = {}) => {
-        if (window.WSACTION.CONTEXT_MANAGER) {
-            window.WSACTION.CONTEXT_MANAGER.addExtension(CONTEXT.MODULE_NAME, {
-                location: window.location,
-                ...CONTEXT,
-                ...CTXAddons
+        let isRegistered = false;
+        let retryCount = 0;
+        const MAX_RETRIES = 30;
+        const RETRY_INTERVAL = 1000; // 1 segundo
+
+        const registerContext = () => {
+            if (window.WSACTION?.CONTEXT_MANAGER) {
+                window.WSACTION.CONTEXT_MANAGER.addExtension(CONTEXT.MODULE_NAME, {
+                    location: window.location,
+                    ...CONTEXT,
+                    ...CTXAddons
+                });
+                return true;
+            }
+            return false;
+        };
+
+        const specialKeys = {
+            ctrlKey: (event) => event.ctrlKey,
+            altKey: (event) => event.altKey,
+            shiftKey: (event) => event.shiftKey,
+            metaKey: (event) => event.metaKey
+        };
+
+        const handleKeyEvent = (command, event) => {
+            const allKeysMatch = command.keys.every((key) => {
+                if (specialKeys[key.key]) {
+                    return specialKeys[key.key](event);
+                }
+
+                const normalizedKey = key.case_sensitive ? key.key : key.key.toLowerCase();
+                const eventKey = key.case_sensitive ? event.key : event.key.toLowerCase();
+                const eventCode = key.case_sensitive ? event.code : event.code.toLowerCase();
+
+                return eventKey === normalizedKey || eventCode === normalizedKey;
             });
-        }
-    
-        try {
-            // Define todas as possíveis teclas relevantes
-            const specialKeys = {
-                ctrlKey: (event) => event.ctrlKey,
-                altKey: (event) => event.altKey,
-                shiftKey: (event) => event.shiftKey,
-                metaKey: (event) => event.metaKey
-            };
-        
-            // Itera sobre os comandos definidos
-            for (let command of CONTEXT.KEYBOARD_COMMANDS) {
-                document.addEventListener("keydown", (event) => {
-                    // Verifica se todas as teclas definidas no comando foram pressionadas
-                    const allKeysMatch = command.keys.every((key) => {
-                        // Verifica se é uma tecla especial (ctrl, alt, shift, meta)
-                        if (specialKeys[key.key]) {
-                            return specialKeys[key.key](event);
-                        }
-        
-                        // Normaliza a tecla para comparação, dependendo de `case_sensitive`
-                        const normalizedKey = key.case_sensitive ? key.key : key.key.toLowerCase();
-                        const eventKey = key.case_sensitive ? event.key : event.key.toLowerCase();
-                        const eventCode = key.case_sensitive ? event.code : event.code.toLowerCase();
-        
-                        return eventKey === normalizedKey || eventCode === normalizedKey;
-                    });
-        
-                    if (allKeysMatch) {
-                        if (typeof command.function === "function") {
-                            event.preventDefault(); // Evita comportamentos padrão, se necessário
-                            command.function(); // Executa a função associada ao comando
-                        } else {
-                            console.warn(`No function assigned for command: ${command.description}`);
-                        }
+
+            if (allKeysMatch) {
+                if (typeof command.function === "function") {
+                    event.preventDefault();
+                    command.function();
+                } else {
+                    console.warn(`No function assigned for command: ${command.description}`);
+                }
+            }
+        };
+
+        const setupKeyboardListeners = () => {
+            try {
+                CONTEXT.KEYBOARD_COMMANDS.forEach(command => {
+                    const listener = (event) => handleKeyEvent(command, event);
+                    document.addEventListener("keydown", listener);
+
+                    // Armazena o listener para possível remoção futura
+                    command._listener = listener;
+                });
+                return true;
+            } catch (error) {
+                console.error("Error setting up keyboard listeners:", error);
+                return false;
+            }
+        };
+
+        const tryRegister = async () => {
+            if (isRegistered) return true;
+
+            if (registerContext() && setupKeyboardListeners()) {
+                isRegistered = true;
+                console.log("Successfully registered keyboard commands");
+                return true;
+            }
+
+            retryCount++;
+            if (retryCount >= MAX_RETRIES) {
+                console.error("Failed to register keyboard commands after maximum retries");
+                return false;
+            }
+
+            // Agenda próxima tentativa
+            await new Promise(resolve => setTimeout(resolve, RETRY_INTERVAL));
+            return tryRegister();
+        };
+
+        // Função de limpeza para remover os listeners
+        const cleanup = () => {
+            if (CONTEXT.KEYBOARD_COMMANDS) {
+                CONTEXT.KEYBOARD_COMMANDS.forEach(command => {
+                    if (command._listener) {
+                        document.removeEventListener("keydown", command._listener);
+                        delete command._listener;
                     }
                 });
             }
+            isRegistered = false;
+        };
+
+        try {
+            const result = await tryRegister();
+            if (!result) {
+                cleanup();
+                throw new Error("Failed to register keyboard commands");
+            }
+            return cleanup; // Retorna a função de limpeza
         } catch (error) {
-            console.error("Error registering keyboard commands:", error);
+            console.error("Error in register function:", error);
+            cleanup();
+            throw error;
         }
     };
-    
+
     CONTEXT.register = register;
     // Return the context object, which includes methods, properties, and the customData storage
     return CONTEXT

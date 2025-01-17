@@ -3,26 +3,20 @@ import { Application } from 'express';
 import readline from 'readline';
 import path from 'path';
 import chalk from 'chalk';
-import { Extension, Commands } from './types';
+import { Extension, Commands, LoadAllExtensionsConfig, ExtensionInitConfig } from './types';
 
 export class ExtensionReloader {
     constructor(
-        private WSIO: SocketIoServer | null,
-        private APP: Application | null,
-        private RL: readline.Interface | null,
-        private STORAGE: Record<string, any>,
-        private saveStorage: () => void,
-        private EXTENSIONS: { ENABLED: Extension[], DISABLED: Extension[] },
-        private COMMANDS: Commands
+        private config: LoadAllExtensionsConfig
     ) {}
 
     public async reloadExtension(oldExtension: Extension): Promise<void> {
         try {
             // Remove old extension from enabled list
-            const index = this.EXTENSIONS.ENABLED.findIndex(e => e.NAME === oldExtension.NAME);
+            const index = this.config.EXTENSIONS.ENABLED.findIndex(e => e.NAME === oldExtension.NAME);
             if (index === -1) return;
 
-            this.EXTENSIONS.ENABLED.splice(index, 1);
+            this.config.EXTENSIONS.ENABLED.splice(index, 1);
 
             // Clean up old commands
             this.cleanupCommands(oldExtension);
@@ -40,24 +34,24 @@ export class ExtensionReloader {
         } catch (error) {
             console.error(chalk.red(`❌ Error reloading extension ${oldExtension.NAME}:`), error);
             // Re-add the old extension if reload fails
-            this.EXTENSIONS.ENABLED.push(oldExtension);
+            this.config.EXTENSIONS.ENABLED.push(oldExtension);
         }
     }
 
     private cleanupCommands(extension: Extension): void {
         if (extension.COMMANDS) {
             Object.keys(extension.COMMANDS).forEach(event => {
-                this.WSIO?.removeAllListeners(`${extension.NAME}.${event}`);
-                if (this.COMMANDS.CLI[extension.NAME]) {
-                    delete this.COMMANDS.CLI[extension.NAME][event];
+                this.config.WSIO?.removeAllListeners(`${extension.NAME}.${event}`);
+                if (this.config.COMMANDS.CLI[extension.NAME]) {
+                    delete this.config.COMMANDS.CLI[extension.NAME][event];
                 }
             });
         }
     }
 
     private cleanupIOEvents(extension: Extension): void {
-        if (extension.IOEVENTS && this.COMMANDS.IO[extension.NAME]) {
-            delete this.COMMANDS.IO[extension.NAME];
+        if (extension.IOEVENTS && this.config.COMMANDS.IO[extension.NAME]) {
+            delete this.config.COMMANDS.IO[extension.NAME];
         }
     }
 
@@ -70,20 +64,22 @@ export class ExtensionReloader {
         });
 
         // Re-require and initialize the extension
-        const extensionModule = require(extensionPath);
+        const extensionModule = require(path.join(extensionPath, 'index.js'));
         const metaPath = path.join(extensionPath, "meta.json");
         const metadata = JSON.parse(require('fs').readFileSync(metaPath, 'utf8'));
 
-        const newExtension = extensionModule({
-            WSIO: this.WSIO,
-            APP: this.APP,
-            RL: this.RL,
-            STORAGE: { data: this.STORAGE, save: this.saveStorage },
+        const initConfig: ExtensionInitConfig = {
+            WSIO: this.config.WSIO,
+            APP: this.config.APP,
+            RL: this.config.RL,
+            STORAGE: { data: this.config.STORAGE, save: this.config.saveStorage },
             EXPRESS: require('express'),
             WEB_SCRIPTS: metadata?.WEB_SCRIPTS || ['client.js'],
+            GLOBAL_SCRIPTS: metadata?.GLOBAL_SCRIPTS || [],
             EXTENSION_PATH: extensionPath,
-            ID: metadata.id
-        });
+            ID: metadata.id || ''
+        };
+        const newExtension = extensionModule(initConfig);
 
         if (newExtension.ENABLED) {
             await this.initializeNewExtension(newExtension);
@@ -93,23 +89,23 @@ export class ExtensionReloader {
 
     private async initializeNewExtension(extension: Extension): Promise<void> {
         extension.onInitialize();
-        this.EXTENSIONS.ENABLED.push(extension);
-        this.STORAGE[extension.NAME] ||= {};
+        this.config.EXTENSIONS.ENABLED.push(extension);
+        this.config.STORAGE[extension.NAME] ||= {};
 
         // Configure new commands
         if (extension.COMMANDS) {
             Object.entries(extension.COMMANDS).forEach(([event, handler]) => {
-                this.WSIO?.on(`${extension.NAME}.${event}`, handler._function);
-                this.COMMANDS.CLI[extension.NAME] ||= {};
-                this.COMMANDS.CLI[extension.NAME][event] = handler;
+                this.config.WSIO?.on(`${extension.NAME}.${event}`, handler._function);
+                this.config.COMMANDS.CLI[extension.NAME] ||= {};
+                this.config.COMMANDS.CLI[extension.NAME][event] = handler;
             });
         }
 
         // Configure new IO events
         if (extension.IOEVENTS) {
             Object.entries(extension.IOEVENTS).forEach(([event, handler]) => {
-                this.COMMANDS.IO[extension.NAME] ||= {};
-                this.COMMANDS.IO[extension.NAME][event] = handler;
+                this.config.COMMANDS.IO[extension.NAME] ||= {};
+                this.config.COMMANDS.IO[extension.NAME][event] = handler;
             });
         }
     }

@@ -38,22 +38,24 @@ const ModuleController = (() => {
         APP = app;
         WSIO = wsio;
         RL = rl;
+        
+        let config = {
+            APP: APP,
+            COMMANDS: COMMANDS,
+            EXTENSIONS: EXTENSIONS,
+            RL: RL,
+            saveStorage: () => saveStorage(STORAGE),
+            STORAGE: STORAGE,
+            WSIO: WSIO
+        }
 
         createExtensionsDirectory();
         loadStorage(STORAGE);
-        loadAllExtensions(WSIO, APP, RL, STORAGE, () => saveStorage(STORAGE), EXTENSIONS, COMMANDS);
+        loadAllExtensions(config);
         registerStorageHandlers(WSIO, createStorageHandlers(STORAGE, () => saveStorage(STORAGE)));
 
         // Initialize hot reload manager
-        hotReloadManager = new HotReloadManager(
-            WSIO,
-            APP,
-            RL,
-            STORAGE,
-            () => saveStorage(STORAGE),
-            EXTENSIONS,
-            COMMANDS
-        );
+        hotReloadManager = new HotReloadManager(config);
 
         // Start watching all enabled extensions
         hotReloadManager.watchAllExtensions();
